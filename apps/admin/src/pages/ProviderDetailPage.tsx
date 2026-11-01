@@ -27,15 +27,22 @@ import { useAsync } from '../api/useAsync'
 import { Badge, PageHead } from '../components/ui'
 import { ErrorPanel, LoadingPanel } from '../components/ScreenState'
 import { ConfirmDialog, Modal } from '../components/Modal'
+import { useI18n } from '../i18n/I18nProvider'
 
 function fmtPrice(value: number | null) {
   return value === null ? '—' : String(value)
 }
 
 function TestBadge({ result }: { result: TestResult | undefined }) {
-  if (!result) return <span className="hint">未测试</span>
-  if (result.ok) return <Badge tone="ok">成功 · {result.latency_ms}ms</Badge>
-  return <Badge tone="bad">{result.error?.code ?? '失败'}</Badge>
+  const { tr } = useI18n()
+  if (!result) return <span className="hint">{tr('未测试', 'Not tested')}</span>
+  if (result.ok)
+    return (
+      <Badge tone="ok">
+        {tr('成功', 'Passed')} · {result.latency_ms}ms
+      </Badge>
+    )
+  return <Badge tone="bad">{result.error?.code ?? tr('失败', 'Failed')}</Badge>
 }
 
 interface AccountDraft {
@@ -111,6 +118,7 @@ function modelInput(draft: ModelDraft): CreateModelInput {
 export function ProviderDetailPage() {
   const { providerId = '' } = useParams()
   const navigate = useNavigate()
+  const { tr, locale } = useI18n()
   const { data, loading, error, reload } = useAsync(
     () =>
       Promise.all([getProvider(providerId), listAccounts(providerId), listModels(providerId)]).then(
@@ -145,7 +153,7 @@ export function ProviderDetailPage() {
     try {
       setProviderTest(await testProvider(providerId))
     } catch (err) {
-      handleApiError(err, '测试失败')
+      handleApiError(err, tr('测试失败', 'Test failed'))
     } finally {
       setBusy(null)
     }
@@ -158,7 +166,7 @@ export function ProviderDetailPage() {
       const result = await testAccount(providerId, account.id)
       setAccountTests((prev) => ({ ...prev, [account.id]: result }))
     } catch (err) {
-      handleApiError(err, '账号测试失败')
+      handleApiError(err, tr('账号测试失败', 'Account test failed'))
     } finally {
       setBusy(null)
     }
@@ -172,7 +180,7 @@ export function ProviderDetailPage() {
       await patchProvider(providerId, { status: data.provider.status === 'active' ? 'disabled' : 'active' })
       reload()
     } catch (err) {
-      handleApiError(err, '更新供应商状态失败')
+      handleApiError(err, tr('更新供应商状态失败', 'Failed to update provider status'))
     } finally {
       setBusy(null)
     }
@@ -185,7 +193,7 @@ export function ProviderDetailPage() {
       await patchAccount(providerId, account.id, { status: account.status === 'active' ? 'disabled' : 'active' })
       reload()
     } catch (err) {
-      handleApiError(err, '更新账号状态失败')
+      handleApiError(err, tr('更新账号状态失败', 'Failed to update account status'))
     } finally {
       setBusy(null)
     }
@@ -206,7 +214,7 @@ export function ProviderDetailPage() {
         setAccountErrors(err.errors)
         setActionError(err.detail)
       } else {
-        setActionError('添加上游账号失败')
+        setActionError(tr('添加上游账号失败', 'Failed to add account'))
       }
     } finally {
       setBusy(null)
@@ -228,7 +236,7 @@ export function ProviderDetailPage() {
         setModelErrors(err.errors)
         setActionError(err.detail)
       } else {
-        setActionError('添加上游模型失败')
+        setActionError(tr('添加上游模型失败', 'Failed to add upstream model'))
       }
     } finally {
       setBusy(null)
@@ -242,7 +250,7 @@ export function ProviderDetailPage() {
       await deleteProvider(providerId)
       navigate('/providers', { replace: true })
     } catch (err) {
-      handleApiError(err, '删除供应商失败')
+      handleApiError(err, tr('删除供应商失败', 'Failed to delete provider'))
       setDeleteProviderOpen(false)
     } finally {
       setBusy(null)
@@ -258,7 +266,7 @@ export function ProviderDetailPage() {
       setDeleteAccountTarget(null)
       reload()
     } catch (err) {
-      handleApiError(err, '删除账号失败')
+      handleApiError(err, tr('删除账号失败', 'Failed to delete account'))
     } finally {
       setBusy(null)
     }
@@ -273,7 +281,7 @@ export function ProviderDetailPage() {
       setDeleteModelTarget(null)
       reload()
     } catch (err) {
-      handleApiError(err, '删除上游模型失败')
+      handleApiError(err, tr('删除上游模型失败', 'Failed to delete upstream model'))
     } finally {
       setBusy(null)
     }
@@ -282,15 +290,29 @@ export function ProviderDetailPage() {
   if (loading && !data) {
     return (
       <>
-        <PageHead title="供应商详情" actions={<Link className="btn" to="/providers">返回列表</Link>} />
-        <LoadingPanel title="正在读取供应商…" />
+        <PageHead
+          title={tr('供应商详情', 'Provider detail')}
+          actions={
+            <Link className="btn" to="/providers">
+              {tr('返回列表', 'Back to list')}
+            </Link>
+          }
+        />
+        <LoadingPanel title={tr('正在读取供应商…', 'Loading providers…')} />
       </>
     )
   }
   if (error) {
     return (
       <>
-        <PageHead title="供应商详情" actions={<Link className="btn" to="/providers">返回列表</Link>} />
+        <PageHead
+          title={tr('供应商详情', 'Provider detail')}
+          actions={
+            <Link className="btn" to="/providers">
+              {tr('返回列表', 'Back to list')}
+            </Link>
+          }
+        />
         <ErrorPanel error={error} onRetry={reload} />
       </>
     )
@@ -302,15 +324,15 @@ export function ProviderDetailPage() {
   return (
     <>
       <PageHead
-        title={`供应商 · ${provider.name}`}
-        desc="账号池、上游模型与连通性。"
+        title={`${tr('供应商', 'Provider')} · ${provider.name}`}
+        desc={tr('账号池、上游模型与连通性。', 'Account pool, upstream models, and connectivity.')}
         actions={
           <>
             <Link className="btn" to="/providers">
-              返回列表
+              {tr('返回列表', 'Back to list')}
             </Link>
             <button className="btn" type="button" onClick={() => void handleTestProvider()} disabled={busy !== null}>
-              {busy === 'provider-test' ? '测试中…' : '测试连通性'}
+              {busy === 'provider-test' ? tr('测试中…', 'Testing…') : tr('测试连通性', 'Test connectivity')}
             </button>
           </>
         }
@@ -325,59 +347,75 @@ export function ProviderDetailPage() {
       <div className="grid cols-2">
         <div className="card">
           <div className="row between">
-            <h3>基础信息</h3>
+            <h3>{tr('基础信息', 'Basics')}</h3>
             <Badge tone={provider.status === 'active' ? 'ok' : ''}>
-              {provider.status === 'active' ? '启用' : '已禁用'}
+              {provider.status === 'active' ? tr('启用', 'Enabled') : tr('已禁用', 'Disabled')}
             </Badge>
           </div>
           <dl className="kv" style={{ marginTop: 10 }}>
-            <dt>类型</dt>
+            <dt>{tr('类型', 'Type')}</dt>
             <dd>{provider.kind}</dd>
             <dt>Base URL</dt>
             <dd>
               <code className="kbd">{provider.base_url}</code>
             </dd>
-            <dt>描述</dt>
+            <dt>{tr('描述', 'Description')}</dt>
             <dd>{provider.description || '—'}</dd>
-            <dt>账号</dt>
+            <dt>{tr('账号', 'Accounts')}</dt>
             <dd>
-              {provider.account_count} 个 · {provider.active_account_count} 个启用
+              {`${provider.account_count} ${tr('个', 'accounts')} · ${provider.active_account_count} ${tr(
+                '个启用',
+                'active',
+              )}`}
             </dd>
-            <dt>上游模型</dt>
-            <dd>{provider.upstream_model_count} 个</dd>
-            <dt>引用别名</dt>
-            <dd>{provider.model_alias_count} 个</dd>
-            <dt>可路由</dt>
-            <dd>{provider.routable ? <Badge tone="ok">是</Badge> : <Badge tone="warn">否</Badge>}</dd>
+            <dt>{tr('上游模型', 'Upstream models')}</dt>
+            <dd>{`${provider.upstream_model_count} ${tr('个', 'items')}`}</dd>
+            <dt>{tr('引用别名', 'Referenced aliases')}</dt>
+            <dd>{`${provider.model_alias_count} ${tr('个', 'aliases')}`}</dd>
+            <dt>{tr('可路由', 'Routable')}</dt>
+            <dd>
+              {provider.routable ? (
+                <Badge tone="ok">{tr('是', 'Yes')}</Badge>
+              ) : (
+                <Badge tone="warn">{tr('否', 'No')}</Badge>
+              )}
+            </dd>
           </dl>
           <div className="row" style={{ marginTop: 14 }}>
             <button className="btn" type="button" onClick={() => void toggleProviderStatus()} disabled={busy !== null}>
-              {provider.status === 'active' ? '禁用供应商' : '启用供应商'}
+              {provider.status === 'active'
+                ? tr('禁用供应商', 'Disable provider')
+                : tr('启用供应商', 'Enable provider')}
             </button>
           </div>
         </div>
         <div className="card">
-          <h3>最近测试</h3>
+          <h3>{tr('最近测试', 'Last test')}</h3>
           {providerTest ? (
             <div className="statebox" style={{ marginTop: 10 }}>
-              <h3>{providerTest.ok ? '测试成功' : '测试失败'}</h3>
+              <h3>{providerTest.ok ? tr('测试成功', 'Test passed') : tr('测试失败', 'Test failed')}</h3>
               <p>
                 {providerTest.ok
-                  ? `耗时 ${providerTest.latency_ms}ms`
-                  : `${providerTest.error?.code ?? '失败'} · ${providerTest.error?.message ?? ''}`}
+                  ? `${tr('耗时', 'Latency')} ${providerTest.latency_ms}ms`
+                  : `${providerTest.error?.code ?? tr('失败', 'Failed')} · ${providerTest.error?.message ?? ''}`}
               </p>
-              <p className="hint">测试时间 {new Date(providerTest.checked_at).toLocaleString('zh-CN')}</p>
+              <p className="hint">
+                {tr('测试时间', 'Tested at')} {new Date(providerTest.checked_at).toLocaleString(locale)}
+              </p>
             </div>
           ) : (
             <p className="sub" style={{ marginTop: 10 }}>
-              点击“测试连通性”检查网络、鉴权与上游响应；不会写入 usage。
+              {tr(
+                '点击“测试连通性”检查网络、鉴权与上游响应；不会写入 usage。',
+                'Click "Test connectivity" to check network, auth, and upstream response. No usage is recorded.',
+              )}
             </p>
           )}
           <dl className="kv" style={{ marginTop: 12 }}>
-            <dt>账号健康</dt>
-            <dd>账号健康由测试/上游请求更新</dd>
-            <dt>探测范围</dt>
-            <dd>网络、凭证、模型名、429</dd>
+            <dt>{tr('账号健康', 'Account health')}</dt>
+            <dd>{tr('账号健康由测试/上游请求更新', 'Updated by tests and upstream requests')}</dd>
+            <dt>{tr('探测范围', 'Probe scope')}</dt>
+            <dd>{tr('网络、凭证、模型名、429', 'Network, credentials, model name, 429')}</dd>
           </dl>
         </div>
       </div>
@@ -385,8 +423,8 @@ export function ProviderDetailPage() {
       <div className="card">
         <div className="row between">
           <div className="row">
-            <h3>账号池</h3>
-            <span className="sub">{accounts.length} 个账号</span>
+            <h3>{tr('账号池', 'Account pool')}</h3>
+            <span className="sub">{`${accounts.length} ${tr('个账号', 'accounts')}`}</span>
           </div>
           <button
             className="btn sm primary"
@@ -397,22 +435,22 @@ export function ProviderDetailPage() {
               setAccountModal(true)
             }}
           >
-            添加账号
+            {tr('添加账号', 'Add account')}
           </button>
         </div>
         <div className="table-wrap" style={{ marginTop: 10 }}>
           <table className="table dense">
             <thead>
               <tr>
-                <th>账号</th>
-                <th>区域</th>
-                <th>权重</th>
-                <th>优先级</th>
+                <th>{tr('账号', 'Account')}</th>
+                <th>{tr('区域', 'Region')}</th>
+                <th>{tr('权重', 'Weight')}</th>
+                <th>{tr('优先级', 'Priority')}</th>
                 <th>RPM</th>
                 <th>TPM</th>
-                <th>健康</th>
-                <th>最近测试</th>
-                <th className="cell-actions">操作</th>
+                <th>{tr('健康', 'Health')}</th>
+                <th>{tr('最近测试', 'Last test')}</th>
+                <th className="cell-actions">{tr('操作', 'Actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -425,8 +463,8 @@ export function ProviderDetailPage() {
                   <td>{account.region || '—'}</td>
                   <td className="num">{account.weight}%</td>
                   <td className="num">{account.priority}</td>
-                  <td className="num">{account.rpm_limit ?? '不限'}</td>
-                  <td className="num">{account.tpm_limit ?? '不限'}</td>
+                  <td className="num">{account.rpm_limit ?? tr('不限', 'Unlimited')}</td>
+                  <td className="num">{account.tpm_limit ?? tr('不限', 'Unlimited')}</td>
                   <td>
                     <Badge tone={account.health === 'ok' ? 'ok' : account.health === 'unhealthy' ? 'bad' : 'warn'}>
                       {account.health}
@@ -443,7 +481,7 @@ export function ProviderDetailPage() {
                         disabled={busy !== null}
                         onClick={() => void handleTestAccount(account)}
                       >
-                        {busy === `account-test-${account.id}` ? '测试中…' : '测试'}
+                        {busy === `account-test-${account.id}` ? tr('测试中…', 'Testing…') : tr('测试', 'Test')}
                       </button>
                       <button
                         className="btn sm"
@@ -451,10 +489,10 @@ export function ProviderDetailPage() {
                         disabled={busy !== null}
                         onClick={() => void toggleAccountStatus(account)}
                       >
-                        {account.status === 'active' ? '禁用' : '启用'}
+                        {account.status === 'active' ? tr('禁用', 'Disable') : tr('启用', 'Enable')}
                       </button>
                       <button className="btn sm danger" type="button" onClick={() => setDeleteAccountTarget(account)}>
-                        删除
+                        {tr('删除', 'Delete')}
                       </button>
                     </span>
                   </td>
@@ -463,7 +501,10 @@ export function ProviderDetailPage() {
               {accounts.length === 0 && (
                 <tr>
                   <td colSpan={9} className="hint">
-                    还没有账号；添加后才会参与路由。
+                    {tr(
+                      '还没有账号；添加后才会参与路由。',
+                      'No accounts yet. Accounts join routing once added.',
+                    )}
                   </td>
                 </tr>
               )}
@@ -475,8 +516,8 @@ export function ProviderDetailPage() {
       <div className="card">
         <div className="row between">
           <div className="row">
-            <h3>上游模型</h3>
-            <span className="sub">{models.length} 个</span>
+            <h3>{tr('上游模型', 'Upstream models')}</h3>
+            <span className="sub">{`${models.length} ${tr('个', 'items')}`}</span>
           </div>
           <button
             className="btn sm primary"
@@ -487,20 +528,20 @@ export function ProviderDetailPage() {
               setModelModal(true)
             }}
           >
-            添加上游模型
+            {tr('添加上游模型', 'Add upstream model')}
           </button>
         </div>
         <div className="table-wrap" style={{ marginTop: 10 }}>
           <table className="table dense">
             <thead>
               <tr>
-                <th>上游模型名</th>
+                <th>{tr('上游模型名', 'Upstream model')}</th>
                 <th>Canonical</th>
-                <th>能力</th>
-                <th>上下文</th>
-                <th>最大输出</th>
-                <th>输入价 / 输出价</th>
-                <th className="cell-actions">操作</th>
+                <th>{tr('能力', 'Capabilities')}</th>
+                <th>{tr('上下文', 'Context')}</th>
+                <th>{tr('最大输出', 'Max output')}</th>
+                <th>{tr('输入价 / 输出价', 'Input / output price')}</th>
+                <th className="cell-actions">{tr('操作', 'Actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -518,7 +559,7 @@ export function ProviderDetailPage() {
                   </td>
                   <td className="cell-actions">
                     <button className="btn sm danger" type="button" onClick={() => setDeleteModelTarget(model)}>
-                      删除
+                      {tr('删除', 'Delete')}
                     </button>
                   </td>
                 </tr>
@@ -526,7 +567,10 @@ export function ProviderDetailPage() {
               {models.length === 0 && (
                 <tr>
                   <td colSpan={7} className="hint">
-                    还没有上游模型；模型组需要引用上游模型与账号部署。
+                    {tr(
+                      '还没有上游模型；模型组需要引用上游模型与账号部署。',
+                      'No upstream models yet. Model groups reference upstream models and account deployments.',
+                    )}
                   </td>
                 </tr>
               )}
@@ -536,28 +580,31 @@ export function ProviderDetailPage() {
       </div>
 
       <div className="card" style={{ borderColor: '#f3c7c2' }}>
-        <h3>危险操作</h3>
+        <h3>{tr('危险操作', 'Danger zone')}</h3>
         <p className="sub" style={{ marginTop: 4 }}>
-          删除供应商会级联删除账号与上游模型；被部署/别名引用时服务端返回 409。
+          {tr(
+            '删除供应商会级联删除账号与上游模型；被部署/别名引用时服务端返回 409。',
+            'Deleting a provider also removes its accounts and models. Returns 409 if referenced by deployments or aliases.',
+          )}
         </p>
         <button className="btn danger" type="button" onClick={() => setDeleteProviderOpen(true)} style={{ marginTop: 10 }}>
-          删除供应商
+          {tr('删除供应商', 'Delete provider')}
         </button>
       </div>
 
       {accountModal && (
         <Modal
-          title="添加账号"
+          title={tr('添加账号', 'Add account')}
           sub={provider.name}
           onClose={() => setAccountModal(false)}
           wide
           footer={
             <>
               <button className="btn" type="button" onClick={() => setAccountModal(false)} disabled={busy !== null}>
-                取消
+                {tr('取消', 'Cancel')}
               </button>
               <button className="btn primary" type="submit" form="create-account-form" disabled={busy !== null}>
-                {busy === 'account-create' ? '保存中…' : '保存账号'}
+                {busy === 'account-create' ? tr('保存中…', 'Saving…') : tr('保存账号', 'Save account')}
               </button>
             </>
           }
@@ -565,7 +612,7 @@ export function ProviderDetailPage() {
           <form id="create-account-form" className="grid" onSubmit={(event) => void handleCreateAccount(event)} noValidate>
             <div className="grid cols-2">
               <div className="field">
-                <label htmlFor="new-account-name">账号名</label>
+                <label htmlFor="new-account-name">{tr('账号名', 'Account name')}</label>
                 <input
                   id="new-account-name"
                   className="input"
@@ -575,7 +622,7 @@ export function ProviderDetailPage() {
                 {accountErrors.name && <span className="field-error">{accountErrors.name}</span>}
               </div>
               <div className="field">
-                <label htmlFor="new-account-region">区域</label>
+                <label htmlFor="new-account-region">{tr('区域', 'Region')}</label>
                 <input
                   id="new-account-region"
                   className="input"
@@ -599,7 +646,7 @@ export function ProviderDetailPage() {
             </div>
             <div className="grid cols-4">
               <div className="field">
-                <label htmlFor="new-account-weight">权重 %</label>
+                <label htmlFor="new-account-weight">{tr('权重 %', 'Weight %')}</label>
                 <input
                   id="new-account-weight"
                   className="input"
@@ -611,7 +658,7 @@ export function ProviderDetailPage() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="new-account-priority">优先级</label>
+                <label htmlFor="new-account-priority">{tr('优先级', 'Priority')}</label>
                 <input
                   id="new-account-priority"
                   className="input"
@@ -623,7 +670,7 @@ export function ProviderDetailPage() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="new-account-rpm">RPM 上限</label>
+                <label htmlFor="new-account-rpm">{tr('RPM 上限', 'RPM limit')}</label>
                 <input
                   id="new-account-rpm"
                   className="input"
@@ -633,7 +680,7 @@ export function ProviderDetailPage() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="new-account-tpm">TPM 上限</label>
+                <label htmlFor="new-account-tpm">{tr('TPM 上限', 'TPM limit')}</label>
                 <input
                   id="new-account-tpm"
                   className="input"
@@ -654,17 +701,17 @@ export function ProviderDetailPage() {
 
       {modelModal && (
         <Modal
-          title="添加上游模型"
+          title={tr('添加上游模型', 'Add upstream model')}
           sub={provider.name}
           onClose={() => setModelModal(false)}
           wide
           footer={
             <>
               <button className="btn" type="button" onClick={() => setModelModal(false)} disabled={busy !== null}>
-                取消
+                {tr('取消', 'Cancel')}
               </button>
               <button className="btn primary" type="submit" form="create-model-form" disabled={busy !== null}>
-                {busy === 'model-create' ? '保存中…' : '保存模型'}
+                {busy === 'model-create' ? tr('保存中…', 'Saving…') : tr('保存模型', 'Save model')}
               </button>
             </>
           }
@@ -672,7 +719,7 @@ export function ProviderDetailPage() {
           <form id="create-model-form" className="grid" onSubmit={(event) => void handleCreateModel(event)} noValidate>
             <div className="grid cols-2">
               <div className="field">
-                <label htmlFor="new-model-name">上游模型名</label>
+                <label htmlFor="new-model-name">{tr('上游模型名', 'Upstream model')}</label>
                 <input
                   id="new-model-name"
                   className="input"
@@ -695,7 +742,9 @@ export function ProviderDetailPage() {
               </div>
             </div>
             <div className="field">
-              <label htmlFor="new-model-capabilities">能力标签（逗号分隔）</label>
+              <label htmlFor="new-model-capabilities">
+                {tr('能力标签（逗号分隔）', 'Capability tags (comma separated)')}
+              </label>
               <input
                 id="new-model-capabilities"
                 className="input"
@@ -706,7 +755,7 @@ export function ProviderDetailPage() {
             </div>
             <div className="grid cols-4">
               <div className="field">
-                <label htmlFor="new-model-context">上下文窗口</label>
+                <label htmlFor="new-model-context">{tr('上下文窗口', 'Context window')}</label>
                 <input
                   id="new-model-context"
                   className="input"
@@ -716,7 +765,7 @@ export function ProviderDetailPage() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="new-model-output">最大输出</label>
+                <label htmlFor="new-model-output">{tr('最大输出', 'Max output')}</label>
                 <input
                   id="new-model-output"
                   className="input"
@@ -726,7 +775,7 @@ export function ProviderDetailPage() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="new-model-price-in">输入价 / 1M</label>
+                <label htmlFor="new-model-price-in">{tr('输入价 / 1M', 'Input price / 1M')}</label>
                 <input
                   id="new-model-price-in"
                   className="input"
@@ -737,7 +786,7 @@ export function ProviderDetailPage() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="new-model-price-out">输出价 / 1M</label>
+                <label htmlFor="new-model-price-out">{tr('输出价 / 1M', 'Output price / 1M')}</label>
                 <input
                   id="new-model-price-out"
                   className="input"
@@ -749,7 +798,7 @@ export function ProviderDetailPage() {
               </div>
             </div>
             <div className="field" style={{ width: 160 }}>
-              <label htmlFor="new-model-currency">币种</label>
+              <label htmlFor="new-model-currency">{tr('币种', 'Currency')}</label>
               <select
                 id="new-model-currency"
                 className="select"
@@ -771,14 +820,19 @@ export function ProviderDetailPage() {
 
       {deleteProviderOpen && (
         <ConfirmDialog
-          title="删除供应商？"
+          title={tr('删除供应商？', 'Delete provider?')}
           desc={
             <>
-              <p>删除会同时移除账号与上游模型；被部署/别名引用时服务端会返回 409。</p>
-              <p className="hint">该操作写入审计。</p>
+              <p>
+                {tr(
+                  '删除会同时移除账号与上游模型；被部署/别名引用时服务端会返回 409。',
+                  'Deleting also removes the accounts and models. Returns 409 if referenced by deployments or aliases.',
+                )}
+              </p>
+              <p className="hint">{tr('该操作写入审计。', 'This action is written to the audit log.')}</p>
             </>
           }
-          confirmText="删除"
+          confirmText={tr('删除', 'Delete')}
           danger
           busy={busy === 'provider-delete'}
           onCancel={() => setDeleteProviderOpen(false)}
@@ -788,9 +842,19 @@ export function ProviderDetailPage() {
 
       {deleteAccountTarget && (
         <ConfirmDialog
-          title={`删除账号 ${deleteAccountTarget.name}？`}
-          desc={<p>被 catalog 部署引用时服务端会返回 409；删除后该账号不再参与路由。</p>}
-          confirmText="删除账号"
+          title={tr(
+            `删除账号 ${deleteAccountTarget.name}？`,
+            `Delete account ${deleteAccountTarget.name}?`,
+          )}
+          desc={
+            <p>
+              {tr(
+                '被 catalog 部署引用时服务端会返回 409；删除后该账号不再参与路由。',
+                'Returns 409 if referenced by catalog deployments. Deleted accounts stop routing.',
+              )}
+            </p>
+          }
+          confirmText={tr('删除账号', 'Delete account')}
           danger
           busy={busy === 'account-delete'}
           onCancel={() => setDeleteAccountTarget(null)}
@@ -800,9 +864,19 @@ export function ProviderDetailPage() {
 
       {deleteModelTarget && (
         <ConfirmDialog
-          title={`删除上游模型 ${deleteModelTarget.name}？`}
-          desc={<p>被模型别名或 catalog 部署引用时服务端会返回 409。</p>}
-          confirmText="删除模型"
+          title={tr(
+            `删除上游模型 ${deleteModelTarget.name}？`,
+            `Delete upstream model ${deleteModelTarget.name}?`,
+          )}
+          desc={
+            <p>
+              {tr(
+                '被模型别名或 catalog 部署引用时服务端会返回 409。',
+                'The server returns 409 if it is referenced by a model alias or catalog deployment.',
+              )}
+            </p>
+          }
+          confirmText={tr('删除模型', 'Delete model')}
           danger
           busy={busy === 'model-delete'}
           onCancel={() => setDeleteModelTarget(null)}

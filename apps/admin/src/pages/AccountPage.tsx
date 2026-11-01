@@ -4,11 +4,13 @@ import { ApiError } from '../api/client'
 import { changePassword } from '../api/auth'
 import { useAuth } from '../auth/AuthProvider'
 import { Badge, PageHead } from '../components/ui'
+import { useI18n } from '../i18n/I18nProvider'
 import { useNavigate } from 'react-router-dom'
 
 export function AccountPage() {
   const auth = useAuth()
   const navigate = useNavigate()
+  const { tr } = useI18n()
   const session = auth.session
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -25,11 +27,11 @@ export function AccountPage() {
     setFieldErrors({})
     setSuccess(false)
     if (newPassword.length < 10) {
-      setFieldErrors({ new_password: '新密码至少 10 个字符' })
+      setFieldErrors({ new_password: tr('新密码至少 10 个字符', 'New password must be at least 10 characters') })
       return
     }
     if (newPassword !== confirm) {
-      setFieldErrors({ confirm: '两次输入的新密码不一致' })
+      setFieldErrors({ confirm: tr('两次输入的新密码不一致', 'New passwords do not match') })
       return
     }
     setSaving(true)
@@ -44,7 +46,7 @@ export function AccountPage() {
         setFieldErrors(err.errors)
         setFormError(err.detail)
       } else {
-        setFormError('修改密码失败')
+        setFormError(tr('修改密码失败', 'Failed to change password'))
       }
     } finally {
       setSaving(false)
@@ -65,21 +67,24 @@ export function AccountPage() {
 
   return (
     <>
-      <PageHead title="账号与会话" desc="当前管理员、修改密码与退出登录。" />
+      <PageHead
+        title={tr('账号与会话', 'Account & session')}
+        desc={tr('当前管理员、修改密码与退出登录。', 'Current administrator, password change and sign-out.')}
+      />
 
       <div className="grid cols-2">
         <div className="card">
-          <h3>当前管理员</h3>
+          <h3>{tr('当前管理员', 'Current administrator')}</h3>
           <dl className="kv" style={{ marginTop: 10 }}>
-            <dt>显示名</dt>
+            <dt>{tr('显示名', 'Display name')}</dt>
             <dd>{session.user.display_name || '—'}</dd>
-            <dt>邮箱</dt>
+            <dt>{tr('邮箱', 'Email')}</dt>
             <dd>{session.user.email}</dd>
-            <dt>状态</dt>
+            <dt>{tr('状态', 'Status')}</dt>
             <dd>
               <Badge tone={session.user.status === 'active' ? 'ok' : 'bad'}>{session.user.status}</Badge>
             </dd>
-            <dt>会话过期</dt>
+            <dt>{tr('会话过期', 'Session expires')}</dt>
             <dd>{new Date(session.expires_at).toLocaleString('zh-CN')}</dd>
             <dt>user_id</dt>
             <dd>
@@ -93,15 +98,15 @@ export function AccountPage() {
             disabled={loggingOut}
             style={{ marginTop: 14 }}
           >
-            {loggingOut ? '退出中…' : '退出登录'}
+            {loggingOut ? tr('退出中…', 'Signing out…') : tr('退出登录', 'Sign out')}
           </button>
         </div>
 
         <div className="card">
-          <h3>修改密码</h3>
+          <h3>{tr('修改密码', 'Change password')}</h3>
           <form className="grid" onSubmit={(event) => void handleSubmit(event)} noValidate style={{ marginTop: 10 }}>
             <div className="field">
-              <label htmlFor="account-current">当前密码</label>
+              <label htmlFor="account-current">{tr('当前密码', 'Current password')}</label>
               <input
                 id="account-current"
                 className="input"
@@ -113,7 +118,7 @@ export function AccountPage() {
               {fieldErrors.current_password && <span className="field-error">{fieldErrors.current_password}</span>}
             </div>
             <div className="field">
-              <label htmlFor="account-new">新密码</label>
+              <label htmlFor="account-new">{tr('新密码', 'New password')}</label>
               <input
                 id="account-new"
                 className="input"
@@ -125,7 +130,7 @@ export function AccountPage() {
               {fieldErrors.new_password && <span className="field-error">{fieldErrors.new_password}</span>}
             </div>
             <div className="field">
-              <label htmlFor="account-confirm">确认新密码</label>
+              <label htmlFor="account-confirm">{tr('确认新密码', 'Confirm new password')}</label>
               <input
                 id="account-confirm"
                 className="input"
@@ -141,18 +146,28 @@ export function AccountPage() {
                 {formError}
               </div>
             )}
-            {success && <div className="note" role="status">密码已更新；其他会话已失效，当前会话保留。</div>}
+            {success && (
+              <div className="note" role="status">
+                {tr(
+                  '密码已更新；其他会话已失效，当前会话保留。',
+                  'Password updated. Other sessions were revoked; this session remains active.',
+                )}
+              </div>
+            )}
             <button className="btn primary" type="submit" disabled={saving}>
-              {saving ? '保存中…' : '更新密码'}
+              {saving ? tr('保存中…', 'Saving…') : tr('更新密码', 'Update password')}
             </button>
           </form>
         </div>
       </div>
 
       <div className="card">
-        <h3>安全说明</h3>
+        <h3>{tr('安全说明', 'Security notes')}</h3>
         <p className="sub" style={{ marginTop: 6 }}>
-          Session Cookie 为 HttpOnly；CSRF token 仅保存在内存，刷新后从 /auth/me 重新获取。修改密码会吊销其他会话。
+          {tr(
+            'Session Cookie 为 HttpOnly；CSRF token 仅保存在内存，刷新后从 /auth/me 重新获取。修改密码会吊销其他会话。',
+            'The session cookie is HttpOnly; the CSRF token is kept in memory only and re-fetched from /auth/me after a refresh. Changing the password revokes other sessions.',
+          )}
         </p>
       </div>
     </>

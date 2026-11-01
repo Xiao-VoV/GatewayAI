@@ -2,6 +2,7 @@ import { getOverview } from '../api/overview'
 import { useAsync } from '../api/useAsync'
 import { ErrorPanel, EmptyPanel, LoadingPanel } from '../components/ScreenState'
 import { Badge, PageHead } from '../components/ui'
+import { useI18n } from '../i18n/I18nProvider'
 
 const loadOverview = () => getOverview(7)
 
@@ -22,20 +23,12 @@ function formatErrorRate(rate: number) {
   return `${percentFormat.format(rate * 100)}%`
 }
 
-const statusLabels: Record<string, string> = {
-  success: '成功',
-  upstream_error: '上游错误',
-  timeout: '超时',
-  gateway_error: '网关错误',
-  client_disconnect: '客户端断开',
-  rejected: '已拒绝',
-}
-
 function TrendChart({ trend }: { trend: { day: string; requests: number }[] }) {
+  const { tr } = useI18n()
   const max = Math.max(1, ...trend.map((day) => day.requests))
   return (
     <div>
-      <div className="bars" role="img" aria-label="最近 7 天请求趋势">
+      <div className="bars" role="img" aria-label={tr('最近 7 天请求趋势', 'Request trend over the last 7 days')}>
         {trend.map((day) => {
           const height = day.requests === 0 ? 6 : Math.max(8, Math.round((day.requests / max) * 100))
           return (
@@ -43,7 +36,7 @@ function TrendChart({ trend }: { trend: { day: string; requests: number }[] }) {
               key={day.day}
               className={day.day === trend[trend.length - 1]?.day ? 'hi' : ''}
               style={{ height: `${height}%` }}
-              title={`${day.day} · ${formatNumber(day.requests)} 请求`}
+              title={`${day.day} · ${formatNumber(day.requests)} ${tr('请求', 'requests')}`}
             />
           )
         })}
@@ -61,18 +54,33 @@ function TrendChart({ trend }: { trend: { day: string; requests: number }[] }) {
 
 export function OverviewPage() {
   const { data, loading, error, reload } = useAsync(loadOverview)
+  const { tr } = useI18n()
+
+  const statusLabels: Record<string, string> = {
+    success: tr('成功', 'Success'),
+    upstream_error: tr('上游错误', 'Upstream error'),
+    timeout: tr('超时', 'Timeout'),
+    gateway_error: tr('网关错误', 'Gateway error'),
+    client_disconnect: tr('客户端断开', 'Client disconnected'),
+    rejected: tr('已拒绝', 'Rejected'),
+  }
+
+  const summaryDesc = tr(
+    '今天的请求、花费、错误率；数据来自 metering。',
+    'Requests, spend and error rate for today, sourced from metering.',
+  )
 
   const refresh = (
     <button className="btn" type="button" onClick={reload} disabled={loading}>
-      {loading ? '刷新中…' : '刷新'}
+      {loading ? tr('刷新中…', 'Refreshing…') : tr('刷新', 'Refresh')}
     </button>
   )
 
   if (loading && !data) {
     return (
       <>
-        <PageHead title="总览" desc="今天的请求、花费、错误率；数据来自 metering。" actions={refresh} />
-        <LoadingPanel title="正在读取总览…" />
+        <PageHead title={tr('总览', 'Overview')} desc={summaryDesc} actions={refresh} />
+        <LoadingPanel title={tr('正在读取总览…', 'Loading overview…')} />
       </>
     )
   }
@@ -80,7 +88,7 @@ export function OverviewPage() {
   if (error) {
     return (
       <>
-        <PageHead title="总览" desc="今天的请求、花费、错误率；数据来自 metering。" actions={refresh} />
+        <PageHead title={tr('总览', 'Overview')} desc={summaryDesc} actions={refresh} />
         <ErrorPanel error={error} onRetry={reload} />
       </>
     )
@@ -89,7 +97,7 @@ export function OverviewPage() {
   if (!data) {
     return (
       <>
-        <PageHead title="总览" actions={refresh} />
+        <PageHead title={tr('总览', 'Overview')} actions={refresh} />
         <LoadingPanel />
       </>
     )
@@ -98,14 +106,13 @@ export function OverviewPage() {
   if (data.totals.requests === 0) {
     return (
       <>
-        <PageHead
-          title="总览"
-          desc="今天的请求、花费、错误率；数据来自 metering。"
-          actions={refresh}
-        />
+        <PageHead title={tr('总览', 'Overview')} desc={summaryDesc} actions={refresh} />
         <EmptyPanel
-          title="还没有请求数据"
-          desc="先配置供应商、模型组与发布，并生成设备配对码；完成第一次推理后，这里会出现请求、花费和错误趋势。"
+          title={tr('还没有请求数据', 'No request data yet')}
+          desc={tr(
+            '先配置供应商、模型组与发布，并生成设备配对码；完成第一次推理后，这里会出现请求、花费和错误趋势。',
+            'Configure a provider, model group and release, then generate a device pairing code. After the first inference, requests, spend and error trends will appear here.',
+          )}
         />
       </>
     )
@@ -118,57 +125,66 @@ export function OverviewPage() {
   return (
     <>
       <PageHead
-        title="总览"
-        desc={`最近 ${data.days} 天；${data.timezone} · 更新于 ${new Date(data.generated_at).toLocaleString('zh-CN')}`}
+        title={tr('总览', 'Overview')}
+        desc={`${tr(`最近 ${data.days} 天；`, `Last ${data.days} days; `)}${data.timezone} · ${tr(
+          '更新于',
+          'Updated',
+        )} ${new Date(data.generated_at).toLocaleString('zh-CN')}`}
         actions={refresh}
       />
 
       <div className="grid cols-4">
         <div className="card stat">
-          <div className="sub">今日请求</div>
+          <div className="sub">{tr('今日请求', 'Requests today')}</div>
           <div className="num">{formatNumber(data.today.requests)}</div>
           <div className="metric-change">
-            成功 {formatNumber(data.today.success_requests)} · 拒绝 {formatNumber(data.today.rejected_requests)}
+            {tr('成功', 'Success')} {formatNumber(data.today.success_requests)} · {tr('拒绝', 'Rejected')}{' '}
+            {formatNumber(data.today.rejected_requests)}
           </div>
         </div>
         <div className="card stat">
-          <div className="sub">今日花费</div>
+          <div className="sub">{tr('今日花费', 'Spend today')}</div>
           <div className="num">{formatCost(data.today.cost)}</div>
-          <div className="metric-change">币种 {data.currency}</div>
+          <div className="metric-change">
+            {tr('币种', 'Currency')} {data.currency}
+          </div>
         </div>
         <div className="card stat">
-          <div className="sub">今日错误率</div>
+          <div className="sub">{tr('今日错误率', 'Error rate today')}</div>
           <div className="num">{formatErrorRate(errorRate)}</div>
           <div className="metric-change">
-            错误 {formatNumber(data.today.error_requests)} · 断开 {formatNumber(data.today.client_disconnect_requests)}
+            {tr('错误', 'Errors')} {formatNumber(data.today.error_requests)} · {tr('断开', 'Disconnects')}{' '}
+            {formatNumber(data.today.client_disconnect_requests)}
           </div>
         </div>
         <div className="card stat">
-          <div className="sub">最近 {data.days} 天请求</div>
+          <div className="sub">{tr(`最近 ${data.days} 天请求`, `Requests in the last ${data.days} days`)}</div>
           <div className="num">{formatNumber(data.totals.requests)}</div>
-          <div className="metric-change">花费 {formatCost(data.totals.cost)}</div>
+          <div className="metric-change">
+            {tr('花费', 'Spend')} {formatCost(data.totals.cost)}
+          </div>
         </div>
       </div>
 
       <div className="grid cols-2">
         <div className="card">
           <div className="row between">
-            <h3>请求趋势</h3>
-            <span className="sub">最近 {data.days} 天</span>
+            <h3>{tr('请求趋势', 'Request trend')}</h3>
+            <span className="sub">{tr(`最近 ${data.days} 天`, `Last ${data.days} days`)}</span>
           </div>
           {data.trend.length === 0 ? (
-            <div className="chart-empty">暂无趋势数据</div>
+            <div className="chart-empty">{tr('暂无趋势数据', 'No trend data yet')}</div>
           ) : (
             <TrendChart trend={data.trend} />
           )}
         </div>
         <div className="card">
           <div className="row between">
-            <h3>今日状态</h3>
-            <span className="sub">按请求结果</span>
+            <h3>{tr('今日状态', 'Status today')}</h3>
+            <span className="sub">{tr('按请求结果', 'By request outcome')}</span>
           </div>
           {statusEntries.length === 0 ? (
-            <div className="chart-empty">今日暂无请求</div>
+            <div className="chart-empty">{tr('今日暂无请求', 'No requests today')}</div>
           ) : (
             <div style={{ marginTop: 8 }}>
               {statusEntries.map(([status, count]) => (
@@ -189,44 +205,46 @@ export function OverviewPage() {
       <div className="grid cols-2">
         <div className="card">
           <div className="row between">
-            <h3>Token 与成本</h3>
-            <span className="sub">今日</span>
+            <h3>{tr('Token 与成本', 'Tokens & cost')}</h3>
+            <span className="sub">{tr('今日', 'Today')}</span>
           </div>
           <div style={{ marginTop: 10 }}>
             <div className="status-row">
-              <span className="sub">输入 tokens</span>
+              <span className="sub">{tr('输入 tokens', 'Input tokens')}</span>
               <span style={{ marginLeft: 'auto' }}>{formatNumber(data.today.input_tokens)}</span>
             </div>
             <div className="status-row">
-              <span className="sub">输出 tokens</span>
+              <span className="sub">{tr('输出 tokens', 'Output tokens')}</span>
               <span style={{ marginLeft: 'auto' }}>{formatNumber(data.today.output_tokens)}</span>
             </div>
             <div className="status-row">
-              <span className="sub">今日成本</span>
+              <span className="sub">{tr('今日成本', 'Cost today')}</span>
               <span style={{ marginLeft: 'auto' }}>{formatCost(data.today.cost)}</span>
             </div>
           </div>
         </div>
         <div className="card">
           <div className="row between">
-            <h3>合计</h3>
-            <span className="sub">最近 {data.days} 天</span>
+            <h3>{tr('合计', 'Totals')}</h3>
+            <span className="sub">{tr(`最近 ${data.days} 天`, `Last ${data.days} days`)}</span>
           </div>
           <div style={{ marginTop: 10 }}>
             <div className="status-row">
-              <span className="sub">成功 / 错误</span>
+              <span className="sub">
+                {tr('成功', 'Success')} / {tr('错误', 'Errors')}
+              </span>
               <span style={{ marginLeft: 'auto' }}>
                 {formatNumber(data.totals.success_requests)} / {formatNumber(data.totals.error_requests)}
               </span>
             </div>
             <div className="status-row">
-              <span className="sub">输入 / 输出 tokens</span>
+              <span className="sub">{tr('输入 / 输出 tokens', 'Input / output tokens')}</span>
               <span style={{ marginLeft: 'auto' }}>
                 {formatNumber(data.totals.input_tokens)} / {formatNumber(data.totals.output_tokens)}
               </span>
             </div>
             <div className="status-row">
-              <span className="sub">总成本</span>
+              <span className="sub">{tr('总成本', 'Total cost')}</span>
               <span style={{ marginLeft: 'auto' }}>{formatCost(data.totals.cost)}</span>
             </div>
           </div>

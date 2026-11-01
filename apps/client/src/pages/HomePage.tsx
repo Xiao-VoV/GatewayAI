@@ -124,7 +124,7 @@ export function HomePage() {
     <>
       <section className="home-hero">
         <div className="home-hero-copy">
-          <span className="eyebrow">GW CLIENT</span>
+          <span className="eyebrow">ORVEIL AI GATEWAY</span>
           <h2>
             {greeting(locale)}，{snapshot.user.display_name || snapshot.user.email.split('@')[0]}
           </h2>

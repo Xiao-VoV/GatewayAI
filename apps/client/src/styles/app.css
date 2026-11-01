@@ -1,4 +1,4 @@
-/* GW Client — native desktop layout (no simulated window chrome) */
+/* Orveil Desktop — native desktop layout (no simulated window chrome) */
 :root {
   --bg: #f3f5f8;
   --surface: #ffffff;
@@ -93,6 +93,7 @@ button:disabled { cursor: not-allowed; opacity: .58; }
   flex: 0 0 30px;
   box-shadow: 0 4px 12px rgba(47, 111, 235, .28);
 }
+.brand-mark-img { width: 32px; height: 32px; border-radius: 9px; flex: none; display: block; box-shadow: 0 4px 12px rgba(20, 24, 32, .18); }
 .client-nav { display: flex; flex-direction: column; gap: 2px; }
 .client-nav-label { font-size: 10px; color: var(--sidebar-muted); letter-spacing: .1em; text-transform: uppercase; padding: 0 10px 8px; }
 .client-nav a { display: flex; align-items: center; gap: 9px; padding: 9px 10px; border-radius: 8px; font-size: 12.5px; color: var(--sidebar-text); transition: background .12s ease, color .12s ease; }

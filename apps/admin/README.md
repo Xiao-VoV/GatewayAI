@@ -1,4 +1,4 @@
-# @gw/admin — AI Gateway 管理台
+# Orveil Console — 管理台
 
 独立管理端应用（React 19 + Vite + TypeScript），只通过 HTTP 调用 `server/`，**不导入服务端代码**。
 

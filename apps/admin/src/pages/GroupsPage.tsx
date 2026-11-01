@@ -16,6 +16,7 @@ import { useAsync } from '../api/useAsync'
 import { Badge, PageHead } from '../components/ui'
 import { ConfirmDialog, Modal } from '../components/Modal'
 import { EmptyPanel, ErrorPanel, LoadingPanel } from '../components/ScreenState'
+import { useI18n } from '../i18n/I18nProvider'
 
 type Tab = 'users' | 'groups'
 
@@ -33,6 +34,7 @@ interface GroupDraft {
 const emptyGroup: GroupDraft = { name: '', description: '', member_ids: [] }
 
 export function GroupsPage() {
+  const { tr, locale } = useI18n()
   const [tab, setTab] = useState<Tab>('users')
   const { data, loading, error, reload } = useAsync(
     () =>
@@ -77,7 +79,7 @@ export function GroupsPage() {
       setUserDraft(null)
       reload()
     } catch (err) {
-      handleError(err, '更新员工失败')
+      handleError(err, tr('更新员工失败', 'Failed to update employee'))
     } finally {
       setBusy(null)
     }
@@ -94,7 +96,7 @@ export function GroupsPage() {
       })
       setPairingCode(response.pairing_code)
     } catch (err) {
-      handleError(err, '生成配对码失败')
+      handleError(err, tr('生成配对码失败', 'Failed to generate pairing code'))
     } finally {
       setBusy(null)
     }
@@ -122,7 +124,7 @@ export function GroupsPage() {
       setGroupErrors({})
       setGroupModalOpen(true)
     } catch (err) {
-      handleError(err, '读取用户组失败')
+      handleError(err, tr('读取用户组失败', 'Failed to load user group'))
     } finally {
       setBusy(null)
     }
@@ -154,7 +156,7 @@ export function GroupsPage() {
         setGroupErrors(err.errors)
         setActionError(err.detail)
       } else {
-        setActionError('保存用户组失败')
+        setActionError(tr('保存用户组失败', 'Failed to save user group'))
       }
     } finally {
       setBusy(null)
@@ -170,7 +172,7 @@ export function GroupsPage() {
       setDeleteGroupTarget(null)
       reload()
     } catch (err) {
-      handleError(err, '删除用户组失败')
+      handleError(err, tr('删除用户组失败', 'Failed to delete user group'))
     } finally {
       setBusy(null)
     }
@@ -187,21 +189,27 @@ export function GroupsPage() {
 
   const refresh = (
     <button className="btn" type="button" onClick={reload} disabled={loading}>
-      {loading ? '刷新中…' : '刷新'}
+      {loading ? tr('刷新中…', 'Refreshing…') : tr('刷新', 'Refresh')}
     </button>
   )
+
+  const userCount = data?.users.length ?? 0
+  const groupCount = data?.groups.length ?? 0
 
   return (
     <>
       <PageHead
-        title="用户与用户组"
-        desc="员工状态与组授权；组用于发布/工具默认的作用域。"
+        title={tr('用户与用户组', 'Users & groups')}
+        desc={tr(
+          '员工状态与组授权；组用于发布/工具默认的作用域。',
+          'Manage employee status and group access. Groups scope model publishing and tool defaults.',
+        )}
         actions={
           <>
             {refresh}
             {tab === 'groups' && (
               <button className="btn primary" type="button" onClick={openCreateGroup}>
-                新建用户组
+                {tr('新建用户组', 'New group')}
               </button>
             )}
           </>
@@ -210,10 +218,10 @@ export function GroupsPage() {
 
       <div className="tabs">
         <button className={tab === 'users' ? 'active' : ''} type="button" onClick={() => setTab('users')}>
-          员工（{data?.users.length ?? 0}）
+          {tr(`员工（${userCount}）`, `Employees (${userCount})`)}
         </button>
         <button className={tab === 'groups' ? 'active' : ''} type="button" onClick={() => setTab('groups')}>
-          用户组（{data?.groups.length ?? 0}）
+          {tr(`用户组（${groupCount}）`, `Groups (${groupCount})`)}
         </button>
       </div>
 
@@ -224,24 +232,27 @@ export function GroupsPage() {
       )}
 
       {loading && !data ? (
-        <LoadingPanel title="正在读取员工与用户组…" />
+        <LoadingPanel title={tr('正在读取员工与用户组…', 'Loading employees and groups…')} />
       ) : error ? (
         <ErrorPanel error={error} onRetry={reload} />
       ) : tab === 'users' ? (
         !data || data.users.length === 0 ? (
           <EmptyPanel
-            title="还没有员工"
-            desc="员工首次通过配对码登录时自动创建；可先创建配对码发给员工。"
+            title={tr('还没有员工', 'No employees yet')}
+            desc={tr(
+              '员工首次通过配对码登录时自动创建；可先创建配对码发给员工。',
+              'Employees are created on their first pairing-code sign-in. Generate a pairing code and share it with them to get started.',
+            )}
           />
         ) : (
           <div className="table-wrap">
             <table className="table dense">
               <thead>
                 <tr>
-                  <th>员工</th>
-                  <th>邮箱</th>
-                  <th>状态</th>
-                  <th className="cell-actions">操作</th>
+                  <th>{tr('员工', 'Employee')}</th>
+                  <th>{tr('邮箱', 'Email')}</th>
+                  <th>{tr('状态', 'Status')}</th>
+                  <th className="cell-actions">{tr('操作', 'Actions')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -255,13 +266,13 @@ export function GroupsPage() {
                       <td>{user.email}</td>
                       <td>
                         <Badge tone={user.status === 'active' ? 'ok' : 'bad'}>
-                          {user.status === 'active' ? '正常' : '已禁用'}
+                          {user.status === 'active' ? tr('正常', 'Active') : tr('已禁用', 'Disabled')}
                         </Badge>
                       </td>
                       <td className="cell-actions">
                         <span className="row-actions">
                           <button className="btn sm" type="button" onClick={() => openEditUser(user)}>
-                            编辑
+                            {tr('编辑', 'Edit')}
                           </button>
                           <button
                             className="btn sm"
@@ -269,7 +280,7 @@ export function GroupsPage() {
                             disabled={busy !== null}
                             onClick={() => void handlePairing(user)}
                           >
-                            {busy === `pairing-${user.id}` ? '生成中…' : '配对码'}
+                            {busy === `pairing-${user.id}` ? tr('生成中…', 'Generating…') : tr('配对码', 'Pairing code')}
                           </button>
                         </span>
                       </td>
@@ -279,17 +290,23 @@ export function GroupsPage() {
               </tbody>
             </table>
             <div className="hint" style={{ padding: '8px 12px' }}>
-              员工由配对码首次登录时创建；禁用后其所有 Key 请求 403。
+              {tr(
+                '员工由配对码首次登录时创建；禁用后其所有 Key 请求 403。',
+                'Employees are created on their first pairing-code sign-in. Disabled employees receive 403 on all key requests.',
+              )}
             </div>
           </div>
         )
       ) : !data || data.groups.length === 0 ? (
         <EmptyPanel
-          title="还没有用户组"
-          desc="用户组用于批量发布模型、工具默认和组策略。"
+          title={tr('还没有用户组', 'No user groups yet')}
+          desc={tr(
+            '用户组用于批量发布模型、工具默认和组策略。',
+            'Groups apply model publishing, tool defaults, and group policies to many employees at once.',
+          )}
           action={
             <button className="btn primary" type="button" onClick={openCreateGroup}>
-              新建用户组
+              {tr('新建用户组', 'New group')}
             </button>
           }
         />
@@ -298,11 +315,11 @@ export function GroupsPage() {
           <table className="table dense">
             <thead>
               <tr>
-                <th>组名</th>
-                <th>描述</th>
-                <th>成员</th>
-                <th>更新时间</th>
-                <th className="cell-actions">操作</th>
+                <th>{tr('组名', 'Group name')}</th>
+                <th>{tr('描述', 'Description')}</th>
+                <th>{tr('成员', 'Members')}</th>
+                <th>{tr('更新时间', 'Updated')}</th>
+                <th className="cell-actions">{tr('操作', 'Actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -314,7 +331,7 @@ export function GroupsPage() {
                   </td>
                   <td>{group.description || '—'}</td>
                   <td className="num">{group.member_count}</td>
-                  <td>{new Date(group.updated_at).toLocaleString('zh-CN')}</td>
+                  <td>{new Date(group.updated_at).toLocaleString(locale)}</td>
                   <td className="cell-actions">
                     <span className="row-actions">
                       <button
@@ -323,10 +340,10 @@ export function GroupsPage() {
                         disabled={busy !== null}
                         onClick={() => void openEditGroup(group)}
                       >
-                        {busy === `group-load-${group.id}` ? '读取中…' : '编辑'}
+                        {busy === `group-load-${group.id}` ? tr('读取中…', 'Loading…') : tr('编辑', 'Edit')}
                       </button>
                       <button className="btn sm danger" type="button" onClick={() => setDeleteGroupTarget(group)}>
-                        删除
+                        {tr('删除', 'Delete')}
                       </button>
                     </span>
                   </td>
@@ -339,23 +356,23 @@ export function GroupsPage() {
 
       {userDraft && (
         <Modal
-          title="编辑员工"
+          title={tr('编辑员工', 'Edit employee')}
           sub={userDraft.email}
           onClose={() => setUserDraft(null)}
           footer={
             <>
               <button className="btn" type="button" onClick={() => setUserDraft(null)} disabled={busy !== null}>
-                取消
+                {tr('取消', 'Cancel')}
               </button>
               <button className="btn primary" type="submit" form="edit-user-form" disabled={busy !== null}>
-                {busy === 'user-save' ? '保存中…' : '保存'}
+                {busy === 'user-save' ? tr('保存中…', 'Saving…') : tr('保存', 'Save')}
               </button>
             </>
           }
         >
           <form id="edit-user-form" className="grid" onSubmit={(event) => void handleSaveUser(event)} noValidate>
             <div className="field">
-              <label htmlFor="user-display-name">显示名</label>
+              <label htmlFor="user-display-name">{tr('显示名', 'Display name')}</label>
               <input
                 id="user-display-name"
                 className="input"
@@ -364,15 +381,15 @@ export function GroupsPage() {
               />
             </div>
             <div className="field">
-              <label htmlFor="user-status">状态</label>
+              <label htmlFor="user-status">{tr('状态', 'Status')}</label>
               <select
                 id="user-status"
                 className="select"
                 value={userForm.status}
                 onChange={(event) => setUserForm({ ...userForm, status: event.target.value as UserDraft['status'] })}
               >
-                <option value="active">正常</option>
-                <option value="disabled">禁用</option>
+                <option value="active">{tr('正常', 'Active')}</option>
+                <option value="disabled">{tr('禁用', 'Disabled')}</option>
               </select>
             </div>
             {actionError && (
@@ -386,17 +403,17 @@ export function GroupsPage() {
 
       {pairingCode && (
         <Modal
-          title="配对码已生成"
-          sub="仅显示一次；10 分钟内有效"
+          title={tr('配对码已生成', 'Pairing code generated')}
+          sub={tr('仅显示一次；10 分钟内有效', 'Shown once; valid for 10 minutes')}
           onClose={() => setPairingCode(null)}
           footer={
             <button className="btn primary" type="button" onClick={() => setPairingCode(null)}>
-              关闭
+              {tr('关闭', 'Close')}
             </button>
           }
         >
           <div className="field">
-            <label>配对码</label>
+            <label>{tr('配对码', 'Pairing code')}</label>
             <div className="row">
               <input className="input" readOnly value={pairingCode.code} style={{ fontFamily: 'var(--mono)' }} />
               <button
@@ -404,48 +421,54 @@ export function GroupsPage() {
                 type="button"
                 onClick={() => void navigator.clipboard?.writeText(pairingCode.code)}
               >
-                复制
+                {tr('复制', 'Copy')}
               </button>
             </div>
             <span className="hint">
-              员工：{pairingCode.user.email} · 有效期至{' '}
-              {new Date(pairingCode.expires_at).toLocaleString('zh-CN')}
+              {tr('员工：', 'Employee: ')}
+              {pairingCode.user.email} · {tr('有效期至', 'Valid until')}{' '}
+              {new Date(pairingCode.expires_at).toLocaleString(locale)}
             </span>
           </div>
-          <p className="hint">在客户端输入服务器地址 + 配对码完成设备注册与 Key 下发。</p>
+          <p className="hint">
+            {tr(
+              '在客户端输入服务器地址 + 配对码完成设备注册与 Key 下发。',
+              'Enter the server address and pairing code in the client to register the device and issue a key.',
+            )}
+          </p>
         </Modal>
       )}
 
       {groupModalOpen && (
         <Modal
-          title={groupEditId ? '编辑用户组' : '新建用户组'}
+          title={groupEditId ? tr('编辑用户组', 'Edit group') : tr('新建用户组', 'New group')}
           onClose={() => setGroupModalOpen(false)}
           wide
           footer={
             <>
               <button className="btn" type="button" onClick={() => setGroupModalOpen(false)} disabled={busy !== null}>
-                取消
+                {tr('取消', 'Cancel')}
               </button>
               <button className="btn primary" type="submit" form="group-form" disabled={busy !== null}>
-                {busy === 'group-save' ? '保存中…' : '保存'}
+                {busy === 'group-save' ? tr('保存中…', 'Saving…') : tr('保存', 'Save')}
               </button>
             </>
           }
         >
           <form id="group-form" className="grid" onSubmit={(event) => void handleSaveGroup(event)} noValidate>
             <div className="field">
-              <label htmlFor="group-name">组名</label>
+              <label htmlFor="group-name">{tr('组名', 'Group name')}</label>
               <input
                 id="group-name"
                 className="input"
-                placeholder="例如 客服组"
+                placeholder={tr('例如 客服组', 'e.g. Support')}
                 value={groupDraft.name}
                 onChange={(event) => setGroupDraft({ ...groupDraft, name: event.target.value })}
               />
               {groupErrors.name && <span className="field-error">{groupErrors.name}</span>}
             </div>
             <div className="field">
-              <label htmlFor="group-description">描述</label>
+              <label htmlFor="group-description">{tr('描述', 'Description')}</label>
               <input
                 id="group-description"
                 className="input"
@@ -455,15 +478,20 @@ export function GroupsPage() {
               {groupErrors.description && <span className="field-error">{groupErrors.description}</span>}
             </div>
             <div className="field">
-              <label>成员（{groupDraft.member_ids.length}）</label>
+              <label>
+                {tr(
+                  `成员（${groupDraft.member_ids.length}）`,
+                  `Members (${groupDraft.member_ids.length})`,
+                )}
+              </label>
               <div className="table-wrap" style={{ maxHeight: 260 }}>
                 <table className="table dense">
                   <thead>
                     <tr>
                       <th></th>
-                      <th>员工</th>
-                      <th>邮箱</th>
-                      <th>状态</th>
+                      <th>{tr('员工', 'Employee')}</th>
+                      <th>{tr('邮箱', 'Email')}</th>
+                      <th>{tr('状态', 'Status')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -484,7 +512,10 @@ export function GroupsPage() {
                     {data && data.users.length === 0 && (
                       <tr>
                         <td colSpan={4} className="hint">
-                          还没有员工；员工通过配对码首次登录后创建。
+                          {tr(
+                            '还没有员工；员工通过配对码首次登录后创建。',
+                            'No employees yet. Employees are created after their first pairing-code sign-in.',
+                          )}
                         </td>
                       </tr>
                     )}
@@ -503,9 +534,16 @@ export function GroupsPage() {
 
       {deleteGroupTarget && (
         <ConfirmDialog
-          title={`删除用户组 ${deleteGroupTarget.name}？`}
-          desc={<p>删除组及其成员关系；发布对象/工具默认中的历史组引用将失效。操作写入审计。</p>}
-          confirmText="删除"
+          title={tr(`删除用户组 ${deleteGroupTarget.name}？`, `Delete group ${deleteGroupTarget.name}?`)}
+          desc={
+            <p>
+              {tr(
+                '删除组及其成员关系；发布对象/工具默认中的历史组引用将失效。操作写入审计。',
+                'Deletes the group and its memberships. Existing references in publishing targets and tool defaults will stop resolving. This action is recorded in the audit log.',
+              )}
+            </p>
+          }
+          confirmText={tr('删除', 'Delete')}
           danger
           busy={busy === 'group-delete'}
           onCancel={() => setDeleteGroupTarget(null)}

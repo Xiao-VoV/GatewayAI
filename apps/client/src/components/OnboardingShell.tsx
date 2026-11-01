@@ -27,10 +27,10 @@ export function OnboardingShell({
     <div className="onboarding">
       <aside className="onboarding-side">
         <Link className="onboarding-brand" to="/welcome">
-          <span className="brand-mark">gw</span>
+          <img className="brand-mark-img" src="/mark-cream.svg" alt="Orveil" />
           <span>
-            GW Client
-            <small>{locale === 'en-US' ? 'Enterprise AI Gateway' : '企业 AI 网关'}</small>
+            Orveil
+            <small>{locale === 'en-US' ? 'AI Gateway' : '帷幄 · 企业 AI 网关'}</small>
           </span>
         </Link>
         <div className="onboarding-copy">

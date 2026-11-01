@@ -121,7 +121,7 @@ export function RecoveryPage() {
 
   async function handleCopy() {
     const lines = [
-      'gw client diagnostics',
+      'Orveil Desktop diagnostics',
       `server: ${client.session?.serverUrl ?? '-'}`,
       `device: ${client.snapshot?.device.name ?? '-'} / ${client.snapshot?.device.id ?? '-'}`,
       `user: ${client.snapshot?.user.email ?? '-'}`,

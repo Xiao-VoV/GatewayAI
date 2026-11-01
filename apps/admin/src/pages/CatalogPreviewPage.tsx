@@ -6,8 +6,10 @@ import type { CatalogPreview } from '../api/preview'
 import { useAsync } from '../api/useAsync'
 import { Badge, PageHead } from '../components/ui'
 import { ErrorPanel, LoadingPanel } from '../components/ScreenState'
+import { useI18n } from '../i18n/I18nProvider'
 
 export function CatalogPreviewPage() {
+  const { tr } = useI18n()
   const { data, loading, error, reload } = useAsync(
     () =>
       Promise.all([listUsers(200), listDevices(200), listKeys(200), listUserGroups(200)]).then(
@@ -34,7 +36,7 @@ export function CatalogPreviewPage() {
 
   async function handlePreview() {
     if (!userId) {
-      setPreviewError('请选择员工')
+      setPreviewError(tr('请选择员工', 'Select an employee first'))
       return
     }
     setBusy(true)
@@ -42,7 +44,7 @@ export function CatalogPreviewPage() {
     try {
       setPreview(await getCatalogPreview(userId, deviceId || undefined, keyId || undefined))
     } catch (err) {
-      setPreviewError(err instanceof ApiError ? err.detail : '预览失败')
+      setPreviewError(err instanceof ApiError ? err.detail : tr('预览失败', 'Preview failed'))
       setPreview(null)
     } finally {
       setBusy(false)
@@ -52,15 +54,27 @@ export function CatalogPreviewPage() {
   if (loading && !data) {
     return (
       <>
-        <PageHead title="员工目录预览" desc="按员工/设备/Key 预览实际可见、可用模型与工具默认。" />
-        <LoadingPanel title="正在读取员工与设备…" />
+        <PageHead
+          title={tr('员工目录预览', 'Employee catalog preview')}
+          desc={tr(
+            '按员工/设备/Key 预览实际可见、可用模型与工具默认。',
+            'Preview the models and tool defaults actually visible and allowed for an employee, device, or key.',
+          )}
+        />
+        <LoadingPanel title={tr('正在读取员工与设备…', 'Loading employees and devices…')} />
       </>
     )
   }
   if (error) {
     return (
       <>
-        <PageHead title="员工目录预览" desc="按员工/设备/Key 预览实际可见、可用模型与工具默认。" />
+        <PageHead
+          title={tr('员工目录预览', 'Employee catalog preview')}
+          desc={tr(
+            '按员工/设备/Key 预览实际可见、可用模型与工具默认。',
+            'Preview the models and tool defaults actually visible and allowed for an employee, device, or key.',
+          )}
+        />
         <ErrorPanel error={error} onRetry={reload} />
       </>
     )
@@ -70,11 +84,14 @@ export function CatalogPreviewPage() {
   return (
     <>
       <PageHead
-        title="员工目录预览"
-        desc="按员工/设备/Key 预览实际可见、可用模型与工具默认；不含价格/供应商/canonical。"
+        title={tr('员工目录预览', 'Employee catalog preview')}
+        desc={tr(
+          '按员工/设备/Key 预览实际可见、可用模型与工具默认；不含价格/供应商/canonical。',
+          'Preview the models and tool defaults actually visible and allowed for an employee, device, or key; excludes pricing, provider, and canonical.',
+        )}
         actions={
           <button className="btn primary" type="button" onClick={() => void handlePreview()} disabled={busy}>
-            {busy ? '预览中…' : '预览目录'}
+            {busy ? tr('预览中…', 'Previewing…') : tr('预览目录', 'Preview catalog')}
           </button>
         }
       />
@@ -82,7 +99,7 @@ export function CatalogPreviewPage() {
       <div className="card">
         <div className="grid cols-3">
           <div className="field">
-            <label htmlFor="preview-user">员工</label>
+            <label htmlFor="preview-user">{tr('员工', 'Employee')}</label>
             <select
               id="preview-user"
               className="select"
@@ -95,7 +112,7 @@ export function CatalogPreviewPage() {
                 setPreviewError(null)
               }}
             >
-              <option value="">选择员工</option>
+              <option value="">{tr('选择员工', 'Select employee')}</option>
               {data.users.map((user) => (
                 <option key={user.id} value={user.id}>
                   {user.display_name || user.email} · {user.email}
@@ -104,7 +121,7 @@ export function CatalogPreviewPage() {
             </select>
           </div>
           <div className="field">
-            <label htmlFor="preview-device">设备（可选）</label>
+            <label htmlFor="preview-device">{tr('设备（可选）', 'Device (optional)')}</label>
             <select
               id="preview-device"
               className="select"
@@ -115,7 +132,7 @@ export function CatalogPreviewPage() {
               }}
               disabled={!userId}
             >
-              <option value="">不指定设备</option>
+              <option value="">{tr('不指定设备', 'Any device')}</option>
               {userDevices.map((device) => (
                 <option key={device.id} value={device.id}>
                   {device.name} · {device.status}
@@ -124,7 +141,7 @@ export function CatalogPreviewPage() {
             </select>
           </div>
           <div className="field">
-            <label htmlFor="preview-key">Key（可选）</label>
+            <label htmlFor="preview-key">{tr('Key（可选）', 'Key (optional)')}</label>
             <select
               id="preview-key"
               className="select"
@@ -135,7 +152,7 @@ export function CatalogPreviewPage() {
               }}
               disabled={!userId}
             >
-              <option value="">不指定 Key</option>
+              <option value="">{tr('不指定 Key', 'Any key')}</option>
               {userKeys.map((key) => (
                 <option key={key.id} value={key.id}>
                   {key.key_prefix} · {key.status}
@@ -151,7 +168,10 @@ export function CatalogPreviewPage() {
         )}
         {!preview && !previewError && (
           <p className="hint" style={{ marginTop: 10 }}>
-            选择员工后可预览该员工实际目录；设备/Key 可选，用于验证白名单/设备维度。
+            {tr(
+              '选择员工后可预览该员工实际目录；设备/Key 可选，用于验证白名单/设备维度。',
+              'Select an employee to preview their effective catalog. Device and key are optional and used to verify allowlists and device scoping.',
+            )}
           </p>
         )}
       </div>
@@ -161,28 +181,35 @@ export function CatalogPreviewPage() {
           <div className="grid cols-2">
             <div className="card">
               <div className="row between">
-                <h3>预览对象</h3>
+                <h3>{tr('预览对象', 'Preview subject')}</h3>
                 <Badge tone="accent">{preview.catalog_version}</Badge>
               </div>
               <dl className="kv" style={{ marginTop: 10 }}>
-                <dt>员工</dt>
+                <dt>{tr('员工', 'Employee')}</dt>
                 <dd>
                   {preview.subject.display_name || preview.subject.email} · {preview.subject.email}
                 </dd>
-                <dt>状态</dt>
+                <dt>{tr('状态', 'Status')}</dt>
                 <dd>{preview.subject.user_status}</dd>
-                <dt>设备</dt>
-                <dd>{preview.subject.device_name ?? '未指定'}</dd>
-                <dt>Key 白名单</dt>
-                <dd>{preview.subject.key_allowed_models.join(', ') || '不限'}</dd>
-                <dt>用户组</dt>
-                <dd>{preview.subject.user_group_ids.length} 个</dd>
+                <dt>{tr('设备', 'Device')}</dt>
+                <dd>{preview.subject.device_name ?? tr('未指定', 'Not specified')}</dd>
+                <dt>{tr('Key 白名单', 'Key allowlist')}</dt>
+                <dd>{preview.subject.key_allowed_models.join(', ') || tr('不限', 'Unrestricted')}</dd>
+                <dt>{tr('用户组', 'User groups')}</dt>
+                <dd>
+                  {tr(
+                    `${preview.subject.user_group_ids.length} 个`,
+                    `${preview.subject.user_group_ids.length} groups`,
+                  )}
+                </dd>
               </dl>
             </div>
             <div className="card">
               <div className="row between">
-                <h3>强制标注</h3>
-                <Badge tone="warn">{preview.models.length} 个可见模型</Badge>
+                <h3>{tr('强制标注', 'Enforcement')}</h3>
+                <Badge tone="warn">
+                  {tr(`${preview.models.length} 个可见模型`, `${preview.models.length} visible models`)}
+                </Badge>
               </div>
               <div style={{ marginTop: 10 }}>
                 <div className="status-row">
@@ -210,19 +237,24 @@ export function CatalogPreviewPage() {
 
           <div className="card">
             <div className="row between">
-              <h3>可见模型</h3>
-              <span className="sub">只投影 visible；allowed 供调用侧判断</span>
+              <h3>{tr('可见模型', 'Visible models')}</h3>
+              <span className="sub">
+                {tr(
+                  '只投影 visible；allowed 供调用侧判断',
+                  'Only visible models are projected; allowed is evaluated on the caller side',
+                )}
+              </span>
             </div>
             <div className="table-wrap" style={{ marginTop: 10 }}>
               <table className="table dense">
                 <thead>
                   <tr>
-                    <th>模型</th>
-                    <th>显示名</th>
-                    <th>上游模型</th>
-                    <th>可见</th>
-                    <th>可用</th>
-                    <th>命中对象</th>
+                    <th>{tr('模型', 'Model')}</th>
+                    <th>{tr('显示名', 'Display name')}</th>
+                    <th>{tr('上游模型', 'Upstream model')}</th>
+                    <th>{tr('可见', 'Visible')}</th>
+                    <th>{tr('可用', 'Allowed')}</th>
+                    <th>{tr('命中对象', 'Matched via')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -234,10 +266,12 @@ export function CatalogPreviewPage() {
                       <td>{model.display_name}</td>
                       <td>{model.upstream_model ?? '—'}</td>
                       <td>
-                        <Badge tone="ok">可见</Badge>
+                        <Badge tone="ok">{tr('可见', 'Visible')}</Badge>
                       </td>
                       <td>
-                        <Badge tone={model.allowed ? 'ok' : 'warn'}>{model.allowed ? '可用' : '不可用'}</Badge>
+                        <Badge tone={model.allowed ? 'ok' : 'warn'}>
+                          {model.allowed ? tr('可用', 'Allowed') : tr('不可用', 'Not allowed')}
+                        </Badge>
                       </td>
                       <td>{model.matched_by ?? '—'}</td>
                     </tr>
@@ -245,7 +279,10 @@ export function CatalogPreviewPage() {
                   {preview.models.length === 0 && (
                     <tr>
                       <td colSpan={6} className="hint">
-                        该员工没有可见模型；检查发布对象/可见状态/Key 白名单。
+                        {tr(
+                          '该员工没有可见模型；检查发布对象/可见状态/Key 白名单。',
+                          'No visible models for this employee. Check publication targets, visibility, and the key allowlist.',
+                        )}
                       </td>
                     </tr>
                   )}
@@ -256,18 +293,20 @@ export function CatalogPreviewPage() {
 
           <div className="card">
             <div className="row between">
-              <h3>工具默认</h3>
-              <span className="sub">默认/可切换均需可见且可用</span>
+              <h3>{tr('工具默认', 'Tool defaults')}</h3>
+              <span className="sub">
+                {tr('默认/可切换均需可见且可用', 'Both default and switchable models must be visible and allowed')}
+              </span>
             </div>
             <div className="table-wrap" style={{ marginTop: 10 }}>
               <table className="table dense">
                 <thead>
                   <tr>
-                    <th>工具</th>
-                    <th>命中层级</th>
-                    <th>默认模型</th>
-                    <th>可切换</th>
-                    <th>告警</th>
+                    <th>{tr('工具', 'Tool')}</th>
+                    <th>{tr('命中层级', 'Matched level')}</th>
+                    <th>{tr('默认模型', 'Default model')}</th>
+                    <th>{tr('可切换', 'Switchable')}</th>
+                    <th>{tr('告警', 'Warnings')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -277,7 +316,7 @@ export function CatalogPreviewPage() {
                         <strong>{tool.tool_key}</strong>
                       </td>
                       <td>{tool.source}</td>
-                      <td>{tool.default_model ?? '无有效默认'}</td>
+                      <td>{tool.default_model ?? tr('无有效默认', 'No valid default')}</td>
                       <td>{tool.switchable_models.join(', ') || '—'}</td>
                       <td>
                         {tool.warnings.length === 0 ? (
@@ -291,7 +330,10 @@ export function CatalogPreviewPage() {
                   {preview.tool_defaults.length === 0 && (
                     <tr>
                       <td colSpan={5} className="hint">
-                        没有工具默认；工具将使用自身默认或提示管理员配置。
+                        {tr(
+                          '没有工具默认；工具将使用自身默认或提示管理员配置。',
+                          'No tool defaults; tools fall back to their own defaults or prompt the admin to configure them.',
+                        )}
                       </td>
                     </tr>
                   )}

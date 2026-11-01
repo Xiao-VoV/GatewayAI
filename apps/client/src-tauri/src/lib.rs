@@ -1,4 +1,4 @@
-//! gw client Tauri composition root.
+//! Orveil Desktop Tauri composition root.
 //!
 //! 分层：commands（薄命令）→ agents/config_tx/platform/router（业务）；
 //! 桌面托盘/窗口在 desktop；这里只做模块装配与插件注册。
@@ -38,5 +38,5 @@ pub fn run() {
             commands::system::native_http_request
         ])
         .run(tauri::generate_context!())
-        .expect("error while running gw client");
+        .expect("error while running Orveil Desktop");
 }

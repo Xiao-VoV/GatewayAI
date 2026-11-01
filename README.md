@@ -1,10 +1,14 @@
 <div align="center">
 
-<img src="assets/logo.svg" width="118" alt="GatewayAI logo" />
+<img src="assets/logo.svg" width="104" alt="Orveil AI Gateway" />
 
-# GatewayAI
+# Orveil AI Gateway
 
-**企业级 AI 网关：一个入口收口多家模型，让 AI 使用看得见、管得住、算得清。**
+**Orveil 帷幄 · 企业 AI 网关**
+
+> 模型可以很多，入口只有一个。
+
+一个 OpenAI 兼容入口，统一接入、路由、计量与治理企业内的所有模型调用。
 
 简体中文 · [English](README.en.md)
 
@@ -14,34 +18,77 @@
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 [![GitHub Stars](https://img.shields.io/github/stars/Xiao-VoV/GatewayAI?style=social)](https://github.com/Xiao-VoV/GatewayAI/stargazers)
 
-[为什么选择](#为什么选择-gatewayai) · [功能](#功能一览) · [架构](#架构) · [快速开始](#快速开始) · [设计文档](#设计文档与-api-契约) · [路线图](#路线图) · [参与贡献](#参与贡献)
+[产品组成](#产品组成) · [界面](#界面) · [能力](#能力一览) · [架构](#架构) · [快速开始](#快速开始) · [API 契约](#api-契约) · [路线图](#路线图)
 
 </div>
 
 ---
 
-## 为什么选择 GatewayAI
+## 为什么是 Orveil
 
 企业用大模型，真正难的不是「调通 API」，而是接入之后的一地鸡毛：
 
 - 几十个团队各自申请 Key，月底才发现账单超支；
 - 员工电脑里的 Key 拷走就能用，离职后仍能继续调；
 - 数据流向说不清、等保检查拿不出证据；
-- 某家供应商限流或封号，全线业务一起停摆。
+- 某家供应商限流或封号，全线业务一起停摆；
+- 每接一个新工具，就要重复配置一遍端点、模型和凭证。
 
-**GatewayAI 用一个 OpenAI 兼容入口收口所有模型调用，把这些问题变成可配置、可审计、可回溯的策略。**
+**Orveil 用一个 OpenAI 兼容入口收口所有模型调用，把这些问题变成可配置、可审计、可回溯的策略。**
 
-| 你关心的问题 | GatewayAI 的做法 |
+| 你关心的问题 | Orveil 的做法 |
 |---|---|
 | 💰 花了多少、谁花的 | 按用户 / 设备 / 模型的预算与配额，超支直接拒绝；用量记账、日聚合、可对账 |
 | 🔐 Key 满天飞、离职带走 | 上游凭证 AES-256-GCM 加密入库，接口只回显掩码；员工使用「一设备一虚拟 Key」，拷走即失效 |
 | 🧾 等保 / 备案怎么举证 | 请求元数据日志与管理操作审计，默认不落正文，口径统一、可导出 |
 | 🛡 供应商故障怎么办 | 多供应商、多账号、多目标路由与降级，单家故障不致命 |
+| 🖥 员工工具怎么接 | Orveil Desktop 一键配对、扫描本机 AI 工具、写入配置与精确回滚 |
 | 🏢 能不能私有化 | 单个 Rust 二进制 + PostgreSQL，`docker compose` 一条命令起步；不依赖 Redis / 消息队列 |
 
 **适合谁**：需要统一管理多团队 AI 用量的企业 IT / 平台团队；要私有化部署、走合规流程的组织；以及想摆脱「每个项目各接一套 SDK」的研发团队。
 
-## 功能一览
+## 产品组成
+
+| 组件 | 说明 | 代码目录 |
+|---|---|---|
+| **Orveil Gateway** | Rust + Axum 网关服务：控制面、数据面、计量与审计 | `server/` |
+| **Orveil Console** | 管理台：供应商、模型目录、设备、Key、预算、日志与审计 | `apps/admin/` |
+| **Orveil Desktop** | Tauri 2 桌面客户端：设备配对、模型目录与用量、本地路由、AI 工具配置与回滚 | `apps/client/` |
+| **Contracts** | 各模块 OpenAPI 契约，由 `contract_tests` 与实现自动对拍 | `contracts/` |
+
+## 界面
+
+### Orveil Console · 管理台
+
+<p align="center">
+  <img src="assets/screenshots/admin-overview-zh.png" width="100%" alt="Orveil Console 总览" />
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/admin-models-zh.png" width="49%" alt="模型目录" />
+  <img src="assets/screenshots/admin-providers-zh.png" width="49%" alt="供应商管理" />
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/admin-audit-zh.png" width="100%" alt="操作审计" />
+</p>
+
+管理台覆盖身份、供应商与凭证、模型目录与发布、用户/组、虚拟 Key、设备配对、请求日志、审计与设置；支持中文 / English 切换。
+
+### Orveil Desktop · 桌面客户端
+
+<p align="center">
+  <img src="assets/screenshots/client-home-zh.png" width="100%" alt="Orveil Desktop 首页" />
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/client-routing-zh.png" width="49%" alt="客户端本地路由" />
+  <img src="assets/screenshots/client-settings-zh.png" width="49%" alt="客户端设置" />
+</p>
+
+桌面端使用原生窗口外壳，无 Web 套壳感；内置浅色 / 深色主题与中英文切换。
+
+## 能力一览
 
 | 模块 | 能力 | 状态 |
 |---|---|---|
@@ -51,7 +98,7 @@
 | 设备与虚拟 Key | 配对码、设备注册、短期设备 token、一设备一虚拟 Key；吊销 / 重置即时生效 | ✅ 可用 |
 | 预算与限流 | 用户日预算、超支拒绝、可读 429；RPM / TPM 后续补齐 | ✅ 可用 |
 | 模型路由 | 模型别名、多上游目标、优先级 / 权重 / 降级候选、可见模型投影 | ✅ 可用 |
-| 代理数据面 | OpenAI Chat / Anthropic Messages、SSE 流式、超时重试、协议适配 | ✅ 可用 |
+| 代理数据面 | OpenAI Chat / Anthropic Messages / Gemini generateContent / OpenAI Responses、SSE 流式、超时重试、协议适配 | ✅ 可用 |
 | 计量与审计 | 请求用量 / 成本、日聚合、请求日志查询、管理操作审计 | ✅ 可用 |
 | 模型目录 | 上游模型 → 部署 → 模型组 → 发布 → 客户端目录 | ✅ 可用 |
 | 管理台 | 16 个页面：身份、供应商、模型目录与发布、用户/组、虚拟 Key、设备配对、日志、审计、设置 | ✅ 可用 |
@@ -62,10 +109,10 @@
 ```mermaid
 flowchart LR
     CLIENT["业务应用 / IDE / Agent"] --> GW
-    ADMIN["管理台（React）"] --> GW
-    DESKTOP["桌面客户端（Tauri）"] --> GW
+    ADMIN["Orveil Console（React）"] --> GW
+    DESKTOP["Orveil Desktop（Tauri）"] --> GW
 
-    subgraph GW["GatewayAI（Rust + Axum）"]
+    subgraph GW["Orveil Gateway（Rust + Axum）"]
         direction TB
         CP["控制面：身份 · 供应商与凭证 · 模型目录"]
         DP["数据面：设备鉴权 · 预算 · 路由 · 代理 · 计量"]
@@ -74,11 +121,9 @@ flowchart LR
     GW --> UP["OpenAI 兼容 / Anthropic / Gemini / Bedrock / 私有模型"]
 ```
 
-- **控制面**：管理员通过管理台维护身份、供应商与凭证、模型目录，配置下发；数据只落 PostgreSQL。
+- **控制面**：管理员通过 Orveil Console 维护身份、供应商与凭证、模型目录，配置下发；数据只落 PostgreSQL。
 - **数据面**：业务请求携带「设备 token + 虚拟 Key」进入网关，依次完成鉴权、预算预检、路由选择、协议代理与用量记账。
 - **一个进程**：模块化单体，单二进制部署；数据库迁移随启动自动执行。
-
-设计文档暂未开源；公开 API 契约见 [`contracts/`](contracts/)。
 
 ## 快速开始
 
@@ -113,12 +158,12 @@ curl -X POST http://127.0.0.1:8080/api/admin/auth/setup \
 
 > 生产部署请设置 `GW_COOKIE_SECURE=true` 并使用 HTTPS；按需开启 `GW_SETUP_TOKEN` 与 `GW_MASTER_KEY`。完整配置见 [`server/.env.example`](server/.env.example)。
 
-### 管理台与客户端
+### 启动管理台与客户端
 
 ```bash
 pnpm install
-pnpm dev:admin      # 管理台 http://localhost:5173（/api 代理到 8080）
-pnpm dev:client     # 浏览器预览 http://localhost:5175
+pnpm dev:admin      # Orveil Console: http://localhost:5173（/api 代理到 8080）
+pnpm dev:client     # 浏览器预览: http://localhost:5175
 
 # 桌面客户端（需要 Rust 与系统 Tauri 依赖，首次编译较慢）
 pnpm --filter @gw/client desktop:dev
@@ -139,16 +184,6 @@ pnpm --filter @gw/client desktop:dev
 
 完整清单见 [`server/.env.example`](server/.env.example)。
 
-## 设计先行
-
-GatewayAI 坚持 **design-first**：每个模块先完成技术设计、接口语义、数据库设计与 OpenAPI 契约，评审通过后才写代码。
-
-- 契约与实现由 `contract_tests` 自动对拍，接口改动必须同步 `contracts/`；
-- 迁移脚本 `server/migrations/` 与数据库设计一一对应；
-- 公开 API 契约在 `contracts/`；模块设计文档暂未开源，后续择机开放。
-
-这套约定让外部贡献者可以在动手前看清边界，也让每一次改动都有据可查。
-
 ## 项目结构
 
 ```text
@@ -159,15 +194,26 @@ server/                 Rust 服务端（Axum + sqlx + PostgreSQL）
   deny.toml             依赖许可证白名单（拒绝 CPAL / AGPL 等不适合的依赖）
 apps/admin/             管理台（React 19 + Vite + TypeScript）
 apps/client/            桌面客户端（React 19 + Vite + Tauri 2）
+assets/                 品牌、截图与 README 素材
 contracts/              各模块 OpenAPI 契约（contract_tests 校验）
 docker-compose.yml      本地 PostgreSQL（仅开发）
 pnpm-workspace.yaml     pnpm workspace（apps/*）
 .github/workflows/      CI：server（fmt/clippy/test/契约/Postgres 集成）/ web（typecheck/build）/ 许可证 / 密钥扫描
 ```
 
-## 设计文档与 API 契约
+## 工程约定
 
-模块设计文档暂未开源，后续会逐步整理公开；公开的 API 契约在 [`contracts/`](contracts/)：
+Orveil 坚持 **design-first**：每个模块先完成技术设计、接口语义、数据库设计与 OpenAPI 契约，评审通过后才写代码。
+
+- 契约与实现由 `contract_tests` 自动对拍，接口改动必须同步 `contracts/`；
+- 迁移脚本 `server/migrations/` 与数据库设计一一对应；
+- 公开 API 契约在 `contracts/`。
+
+这套约定让外部贡献者可以在动手前看清边界，也让每一次改动都有据可查。
+
+## API 契约
+
+公开的 API 契约在 [`contracts/`](contracts/)：
 
 | 契约 | 模块 |
 |---|---|
@@ -185,9 +231,10 @@ pnpm-workspace.yaml     pnpm workspace（apps/*）
 ## 路线图
 
 - [x] **v0.1.0**：服务端核心（身份/供应商/设备/Key/预算/限流/路由/代理/计量/审计/目录/设置）、管理台、桌面客户端
-- [ ] **v0.1.x**：稳定性与兼容性补强、更多协议适配、文档完善
+- [x] **Orveil 品牌与桌面 UI**：正式命名、Ink Monogram 图标、浅色/深色主题、中英文界面
+- [ ] **v0.1.x**：稳定性与兼容性补强、更多协议适配、Windows / Linux 桌面验证
 - [ ] **v0.2**：多租户与配额策略、审计与用量看板、部署体验
-- [ ] **更远**：Responses / Gemini / Bedrock 协议适配、RAG、Prompt 管理与 Agent 工具级治理
+- [ ] **更远**：RAG、Prompt 管理与 Agent 工具级治理
 
 路线图只表达方向，不代表承诺；进度以 issue 与 release 记录为准。
 
@@ -205,7 +252,7 @@ pnpm-workspace.yaml     pnpm workspace（apps/*）
 以 [GNU Affero General Public License v3.0](LICENSE)（AGPL-3.0）发布。
 
 ```text
-Copyright (C) 2026 The GatewayAI Authors
+Copyright (C) 2026 The Orveil Authors
 ```
 
 AGPL-3.0 允许商业使用与自托管；若将修改后的版本作为网络服务提供，需要向使用者提供对应源代码。如需闭源集成或商业授权，请联系维护者。
@@ -214,7 +261,7 @@ AGPL-3.0 允许商业使用与自托管；若将修改后的版本作为网络�
 
 <div align="center">
 
-**如果 GatewayAI 对你的团队有帮助，欢迎点一个 ⭐ Star——这是对开源项目最大的鼓励。**
+**如果 Orveil 对你的团队有帮助，欢迎点一个 ⭐ Star——这是对开源项目最大的鼓励。**
 
 Built with 🦀 Rust · [Axum](https://github.com/tokio-rs/axum) · [sqlx](https://github.com/launchbadge/sqlx) · PostgreSQL
 

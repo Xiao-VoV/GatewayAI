@@ -1,61 +1,12 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
+import { LocaleSwitch } from '../i18n/LocaleSwitch'
+import { useI18n } from '../i18n/I18nProvider'
 
-const groups = [
-  {
-    title: '运营',
-    items: [
-      { to: '/', label: '总览', end: true },
-      { to: '/logs', label: '请求日志' },
-      { to: '/audit', label: '审计' },
-    ],
-  },
-  {
-    title: '资源',
-    items: [
-      { to: '/providers', label: '供应商' },
-      { to: '/models', label: '模型目录' },
-      { to: '/tool-defaults', label: '工具默认' },
-      { to: '/catalog-preview', label: '员工目录预览' },
-      { to: '/keys', label: '虚拟 Key' },
-      { to: '/devices', label: '设备与配对' },
-      { to: '/groups', label: '用户与用户组' },
-    ],
-  },
-  {
-    title: '系统',
-    items: [
-      { to: '/settings', label: '设置' },
-      { to: '/account', label: '账号与会话' },
-    ],
-  },
-]
-
-const titles: Record<string, string> = {
-  '/': '总览',
-  '/providers': '供应商',
-  '/models': '模型目录',
-  '/tool-defaults': '工具默认',
-  '/catalog-preview': '员工目录预览',
-  '/keys': '虚拟 Key',
-  '/devices': '设备与配对',
-  '/groups': '用户与用户组',
-  '/logs': '请求日志',
-  '/audit': '审计',
-  '/settings': '设置',
-  '/account': '账号与会话',
-}
-
-function titleFor(path: string) {
-  if (path.startsWith('/providers/')) return '供应商详情'
-  if (path.startsWith('/models/')) return '模型组详情'
-  return titles[path] ?? '管理台'
-}
-
-function initials(name: string) {
+function initials(name: string, fallback: string) {
   const value = name.trim()
-  if (!value) return '管'
+  if (!value) return fallback
   return value.slice(0, 1).toUpperCase()
 }
 
@@ -63,10 +14,62 @@ export function AdminShell() {
   const { session, logout } = useAuth()
   const navigate = useNavigate()
   const { pathname } = useLocation()
+  const { tr } = useI18n()
   const [loggingOut, setLoggingOut] = useState(false)
 
+  const groups = [
+    {
+      title: tr('运营', 'Operations'),
+      items: [
+        { to: '/', label: tr('总览', 'Overview'), end: true },
+        { to: '/logs', label: tr('请求日志', 'Request logs') },
+        { to: '/audit', label: tr('审计', 'Audit') },
+      ],
+    },
+    {
+      title: tr('资源', 'Resources'),
+      items: [
+        { to: '/providers', label: tr('供应商', 'Providers') },
+        { to: '/models', label: tr('模型目录', 'Model catalog') },
+        { to: '/tool-defaults', label: tr('工具默认', 'Tool defaults') },
+        { to: '/catalog-preview', label: tr('员工目录预览', 'Employee catalog') },
+        { to: '/keys', label: tr('虚拟 Key', 'Virtual keys') },
+        { to: '/devices', label: tr('设备与配对', 'Devices & pairing') },
+        { to: '/groups', label: tr('用户与用户组', 'Users & groups') },
+      ],
+    },
+    {
+      title: tr('系统', 'System'),
+      items: [
+        { to: '/settings', label: tr('设置', 'Settings') },
+        { to: '/account', label: tr('账号与会话', 'Account & session') },
+      ],
+    },
+  ]
+
+  const titles: Record<string, string> = {
+    '/': tr('总览', 'Overview'),
+    '/providers': tr('供应商', 'Providers'),
+    '/models': tr('模型目录', 'Model catalog'),
+    '/tool-defaults': tr('工具默认', 'Tool defaults'),
+    '/catalog-preview': tr('员工目录预览', 'Employee catalog'),
+    '/keys': tr('虚拟 Key', 'Virtual keys'),
+    '/devices': tr('设备与配对', 'Devices & pairing'),
+    '/groups': tr('用户与用户组', 'Users & groups'),
+    '/logs': tr('请求日志', 'Request logs'),
+    '/audit': tr('审计', 'Audit'),
+    '/settings': tr('设置', 'Settings'),
+    '/account': tr('账号与会话', 'Account & session'),
+  }
+
+  function titleFor(path: string) {
+    if (path.startsWith('/providers/')) return tr('供应商详情', 'Provider detail')
+    if (path.startsWith('/models/')) return tr('模型组详情', 'Model group detail')
+    return titles[path] ?? tr('管理台', 'Console')
+  }
+
   const user = session?.user
-  const displayName = user?.display_name || user?.email || '管理员'
+  const displayName = user?.display_name || user?.email || tr('管理员', 'Administrator')
 
   async function handleLogout() {
     setLoggingOut(true)
@@ -82,9 +85,9 @@ export function AdminShell() {
     <div className="app">
       <aside className="sidebar">
         <div className="brand">
-          <span className="logo">G</span>
+          <img className="logo" src="/mark-cream.svg" alt="Orveil" />
           <span>
-            gw admin<small>AI Gateway 管理台</small>
+            Orveil Console<small>{tr('企业 AI 网关控制台', 'Enterprise AI Gateway')}</small>
           </span>
         </div>
         {groups.map((group) => (
@@ -106,25 +109,26 @@ export function AdminShell() {
           </div>
         ))}
         <div className="sidebar-foot">
-          <div>gw admin v0.1 · MVP</div>
+          <div>Orveil Console v0.1</div>
         </div>
       </aside>
       <div className="main">
         <header className="topbar">
           <h1>{titleFor(pathname)}</h1>
-          <span className="crumb">管理台 / {titleFor(pathname)}</span>
+          <span className="crumb">{tr('管理台', 'Console')} / {titleFor(pathname)}</span>
           <div className="topbar-right">
+            <LocaleSwitch />
             <div className="topbar-user">
               <span className="avatar" aria-hidden="true">
-                {initials(displayName)}
+                {initials(displayName, tr('管', 'A'))}
               </span>
               <div className="who">
                 <div>{displayName}</div>
                 <small>{user?.email}</small>
               </div>
             </div>
-            <button className="btn sm ghost" type="button" onClick={() => void handleLogout()} disabled={loggingOut}>
-              {loggingOut ? '退出中…' : '退出'}
+            <button className="btn sm" type="button" onClick={() => void handleLogout()} disabled={loggingOut}>
+              {loggingOut ? tr('退出中…', 'Signing out…') : tr('退出', 'Sign out')}
             </button>
           </div>
         </header>

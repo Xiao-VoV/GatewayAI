@@ -7,6 +7,7 @@ import { useAsync } from '../api/useAsync'
 import { Badge, PageHead } from '../components/ui'
 import { EmptyPanel, ErrorPanel, LoadingPanel } from '../components/ScreenState'
 import { Modal } from '../components/Modal'
+import { useI18n } from '../i18n/I18nProvider'
 
 interface FilterDraft {
   from: string
@@ -37,6 +38,7 @@ function outcomeBadge(outcome: string) {
 }
 
 export function AuditPage() {
+  const { tr } = useI18n()
   const [draft, setDraft] = useState<FilterDraft>(emptyFilters)
   const [filters, setFilters] = useState<FilterDraft>(emptyFilters)
   const [detail, setDetail] = useState<AuditItem | null>(null)
@@ -76,22 +78,31 @@ export function AuditPage() {
         'audit.csv',
       )
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.detail : err instanceof Error ? err.message : '导出失败')
+      setActionError(
+        err instanceof ApiError
+          ? err.detail
+          : err instanceof Error
+            ? err.message
+            : tr('导出失败', 'Export failed'),
+      )
     }
   }
 
   return (
     <>
       <PageHead
-        title="审计"
-        desc="管理员写操作审计；事件只追加，不含 headers/正文/凭证。"
+        title={tr('审计', 'Audit')}
+        desc={tr(
+          '管理员写操作审计；事件只追加，不含 headers/正文/凭证。',
+          'Administrator write-action audit trail. Events are append-only and contain no headers, bodies, or credentials.',
+        )}
         actions={
           <>
             <button className="btn" type="button" onClick={reload} disabled={loading}>
-              {loading ? '刷新中…' : '刷新'}
+              {loading ? tr('刷新中…', 'Refreshing…') : tr('刷新', 'Refresh')}
             </button>
             <button className="btn" type="button" onClick={() => void handleExport()}>
-              导出 CSV
+              {tr('导出 CSV', 'Export CSV')}
             </button>
           </>
         }
@@ -101,7 +112,7 @@ export function AuditPage() {
         <form className="grid" onSubmit={applyFilters}>
           <div className="grid cols-4">
             <div className="field">
-              <label htmlFor="audit-from">开始时间</label>
+              <label htmlFor="audit-from">{tr('开始时间', 'Start time')}</label>
               <input
                 id="audit-from"
                 className="input"
@@ -111,7 +122,7 @@ export function AuditPage() {
               />
             </div>
             <div className="field">
-              <label htmlFor="audit-to">结束时间</label>
+              <label htmlFor="audit-to">{tr('结束时间', 'End time')}</label>
               <input
                 id="audit-to"
                 className="input"
@@ -121,21 +132,21 @@ export function AuditPage() {
               />
             </div>
             <div className="field">
-              <label htmlFor="audit-outcome">结果</label>
+              <label htmlFor="audit-outcome">{tr('结果', 'Outcome')}</label>
               <select
                 id="audit-outcome"
                 className="select"
                 value={draft.outcome}
                 onChange={(event) => setDraft({ ...draft, outcome: event.target.value })}
               >
-                <option value="">全部</option>
+                <option value="">{tr('全部', 'All')}</option>
                 <option value="success">success</option>
                 <option value="failure">failure</option>
                 <option value="denied">denied</option>
               </select>
             </div>
             <div className="field">
-              <label htmlFor="audit-action">动作</label>
+              <label htmlFor="audit-action">{tr('动作', 'Action')}</label>
               <input
                 id="audit-action"
                 className="input"
@@ -147,7 +158,7 @@ export function AuditPage() {
           </div>
           <div className="grid cols-2">
             <div className="field">
-              <label htmlFor="audit-resource-type">资源类型</label>
+              <label htmlFor="audit-resource-type">{tr('资源类型', 'Resource type')}</label>
               <input
                 id="audit-resource-type"
                 className="input"
@@ -157,7 +168,7 @@ export function AuditPage() {
               />
             </div>
             <div className="field">
-              <label htmlFor="audit-resource-id">资源 ID</label>
+              <label htmlFor="audit-resource-id">{tr('资源 ID', 'Resource ID')}</label>
               <input
                 id="audit-resource-id"
                 className="input"
@@ -168,7 +179,7 @@ export function AuditPage() {
           </div>
           <div className="row">
             <button className="btn primary" type="submit">
-              查询
+              {tr('查询', 'Search')}
             </button>
             <button
               className="btn"
@@ -178,9 +189,14 @@ export function AuditPage() {
                 setFilters(emptyFilters)
               }}
             >
-              重置
+              {tr('重置', 'Reset')}
             </button>
-            <span className="hint">默认最近 7 天、最新 100 条；结果成败也记录 denied。</span>
+            <span className="hint">
+              {tr(
+                '默认最近 7 天、最新 100 条；结果成败也记录 denied。',
+                'Defaults to the last 7 days, latest 100 events; outcomes include success, failure, and denied.',
+              )}
+            </span>
           </div>
         </form>
       </div>
@@ -192,21 +208,27 @@ export function AuditPage() {
       )}
 
       {loading && !data ? (
-        <LoadingPanel title="正在读取审计…" />
+        <LoadingPanel title={tr('正在读取审计…', 'Loading audit events…')} />
       ) : error ? (
         <ErrorPanel error={error} onRetry={reload} />
       ) : !data || data.items.length === 0 ? (
-        <EmptyPanel title="没有匹配的审计事件" desc="管理员写操作会记录；调整筛选或时间范围。" />
+        <EmptyPanel
+          title={tr('没有匹配的审计事件', 'No matching audit events')}
+          desc={tr(
+            '管理员写操作会记录；调整筛选或时间范围。',
+            'Administrator write actions are recorded here. Adjust the filters or time range.',
+          )}
+        />
       ) : (
         <div className="table-wrap">
           <table className="table dense">
             <thead>
               <tr>
-                <th>时间</th>
-                <th>操作者</th>
-                <th>动作</th>
-                <th>资源</th>
-                <th>结果</th>
+                <th>{tr('时间', 'Time')}</th>
+                <th>{tr('操作者', 'Actor')}</th>
+                <th>{tr('动作', 'Action')}</th>
+                <th>{tr('资源', 'Resource')}</th>
+                <th>{tr('结果', 'Outcome')}</th>
                 <th>IP</th>
                 <th></th>
               </tr>
@@ -230,7 +252,7 @@ export function AuditPage() {
                   <td>{item.client_ip ?? '—'}</td>
                   <td>
                     <button className="btn sm" type="button" onClick={() => setDetail(item)}>
-                      详情
+                      {tr('详情', 'Details')}
                     </button>
                   </td>
                 </tr>
@@ -238,33 +260,36 @@ export function AuditPage() {
             </tbody>
           </table>
           <div className="hint" style={{ padding: '8px 12px' }}>
-            共 {data.total} 条；detail 已脱敏。
+            {tr(
+              `共 ${data.total} 条；detail 已脱敏。`,
+              `Total: ${data.total} events; detail is redacted.`,
+            )}
           </div>
         </div>
       )}
 
       {detail && (
-        <Modal title="审计详情" onClose={() => setDetail(null)} wide>
+        <Modal title={tr('审计详情', 'Audit details')} onClose={() => setDetail(null)} wide>
           <dl className="kv">
-            <dt>事件 ID</dt>
+            <dt>{tr('事件 ID', 'Event ID')}</dt>
             <dd>
               <code className="kbd">{detail.id}</code>
             </dd>
-            <dt>时间</dt>
+            <dt>{tr('时间', 'Time')}</dt>
             <dd>{new Date(detail.created_at).toLocaleString('zh-CN')}</dd>
-            <dt>操作者</dt>
+            <dt>{tr('操作者', 'Actor')}</dt>
             <dd>
               {detail.actor_email ?? '—'} · {detail.actor_type} · {detail.actor_id ?? '—'}
             </dd>
-            <dt>动作</dt>
+            <dt>{tr('动作', 'Action')}</dt>
             <dd>
               <code className="kbd">{detail.action}</code>
             </dd>
-            <dt>资源</dt>
+            <dt>{tr('资源', 'Resource')}</dt>
             <dd>
               {detail.resource_type} / {detail.resource_id ?? '—'}
             </dd>
-            <dt>结果</dt>
+            <dt>{tr('结果', 'Outcome')}</dt>
             <dd>{detail.outcome}</dd>
             <dt>request_id</dt>
             <dd>{detail.request_id ?? '—'}</dd>

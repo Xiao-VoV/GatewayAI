@@ -3,6 +3,8 @@ import type { ReactNode } from 'react'
 import { setCsrfToken, setUnauthorizedHandler, ApiError } from '../api/client'
 import { getSetupStatus, login as apiLogin, logout as apiLogout, me, setup as apiSetup } from '../api/auth'
 import type { AdminUser, LoginResponse } from '../api/types'
+import { useI18n } from '../i18n/I18nProvider'
+import { setApiLocale } from '../api/client'
 
 type BootStatus = 'booting' | 'ready' | 'error'
 
@@ -21,6 +23,8 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { tr, locale } = useI18n()
+  useEffect(() => setApiLocale(locale), [locale])
   const [status, setStatus] = useState<BootStatus>('booting')
   const [bootError, setBootError] = useState<string | null>(null)
   const [setupRequired, setSetupRequired] = useState(false)
@@ -58,11 +62,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw error
       }
     } catch (error) {
-      const message = error instanceof ApiError ? error.detail : '无法连接管理服务'
+      const message = error instanceof ApiError ? error.detail : tr('无法连接管理服务', 'Unable to reach the admin service')
       setBootError(message)
       setStatus('error')
     }
-  }, [clearSession])
+  }, [clearSession, tr])
 
   useEffect(() => {
     void bootstrap()

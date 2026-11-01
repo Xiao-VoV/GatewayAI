@@ -2,6 +2,14 @@ import type { Problem } from './types'
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? ''
 
+let apiLocale: 'zh-CN' | 'en-US' = 'zh-CN'
+export function setApiLocale(locale: 'zh-CN' | 'en-US') {
+  apiLocale = locale
+}
+export function apiText(zh: string, en: string) {
+  return apiLocale === 'en-US' ? en : zh
+}
+
 let csrfToken: string | null = null
 let unauthorizedHandler: (() => void) | null = null
 
@@ -22,7 +30,7 @@ export class ApiError extends Error {
   readonly retryAfterSeconds: number | null
 
   constructor(status: number, problem: Problem, requestId: string | null, retryAfterSeconds: number | null) {
-    const detail = problem.detail ?? problem.title ?? `请求失败（HTTP ${status}）`
+    const detail = problem.detail ?? problem.title ?? apiText(`请求失败（HTTP ${status}）`, `Request failed (HTTP ${status})`)
     super(detail)
     this.name = 'ApiError'
     this.status = status
@@ -77,7 +85,7 @@ export async function request<T>(path: string, options: RequestInitOptions = {})
       body: body === undefined ? undefined : JSON.stringify(body),
     })
   } catch (error) {
-    throw new ApiError(0, { code: 'network_error', detail: '无法连接网关，请检查服务端地址或网络' }, null, null)
+    throw new ApiError(0, { code: 'network_error', detail: apiText('无法连接网关，请检查服务端地址或网络', 'Unable to reach the gateway. Check the server URL or network.') }, null, null)
   }
 
   const requestId = response.headers.get('x-request-id')
@@ -87,7 +95,7 @@ export async function request<T>(path: string, options: RequestInitOptions = {})
     const problem =
       payload && typeof payload === 'object' && !Array.isArray(payload)
         ? (payload as Problem)
-        : { title: response.statusText || '请求失败', detail: response.statusText || undefined }
+        : { title: response.statusText || apiText('请求失败', 'Request failed'), detail: response.statusText || undefined }
     const error = new ApiError(response.status, problem, requestId, parseRetryAfter(response.headers))
     if (response.status === 401 && !skipUnauthorizedHandler) unauthorizedHandler?.()
     throw error

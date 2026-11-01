@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="Orveil AI Gateway">
+  <defs>
+    <linearGradient id="ink" x1="300" y1="300" x2="720" y2="720" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1C1C1C"/><stop offset="1" stop-color="#090909"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F8F2E7"/><stop offset="1" stop-color="#EDE3D2"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="url(#paper)"/>
+  <rect x="3" y="3" width="1018" height="1018" rx="221" fill="none" stroke="#DED2BF" stroke-width="6"/>
+  <path d="M 611.53 324.82 A 212 212 0 1 1 419.07 321.46" fill="none" stroke="url(#ink)" stroke-width="104" stroke-linecap="round"/>
+  <circle cx="512" cy="512" r="148" fill="none" stroke="#D9CCB7" stroke-width="8"/>
+  <path d="M 646 296 L 708 234" stroke="#D45B43" stroke-width="18" stroke-linecap="round"/>
+</svg>

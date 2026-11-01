@@ -50,10 +50,10 @@ export function ClientShell() {
     <div className="client-app">
       <aside className="client-sidebar">
         <div className="client-brand">
-          <span className="brand-mark">gw</span>
+          <img className="brand-mark-img" src={resolvedTheme === 'dark' ? '/mark-cream.svg' : '/mark-ink.svg'} alt="Orveil" />
           <span>
-            GW Client
-            <small>{locale === 'zh-CN' ? '企业 AI 网关' : 'Enterprise AI Gateway'}</small>
+            Orveil
+            <small>{locale === 'zh-CN' ? '帷幄 · 企业 AI 网关' : 'AI Gateway'}</small>
           </span>
         </div>
 

@@ -7,7 +7,7 @@ export function WelcomePage() {
   const copy =
     locale === 'en-US'
       ? {
-          eyebrow: 'GW CLIENT',
+          eyebrow: 'ORVEIL AI GATEWAY',
           title: 'Connect your AI tools to the enterprise gateway',
           description: 'Pair once to bring Claude Code, Codex, Gemini CLI and other local tools under enterprise models and access control.',
           points: [
@@ -22,7 +22,7 @@ export function WelcomePage() {
           note: 'Requires a gateway enabled by your administrator; network access is needed on first connection.',
         }
       : {
-          eyebrow: 'GW CLIENT',
+          eyebrow: 'ORVEIL AI GATEWAY',
           title: '让 AI 工具安全接入企业网关',
           description: '一次配对，把本机的 Claude Code、Codex、Gemini CLI 等工具统一接入企业模型与权限体系。',
           points: [

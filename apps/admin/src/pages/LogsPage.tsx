@@ -12,6 +12,7 @@ import { useAsync } from '../api/useAsync'
 import { Badge, PageHead } from '../components/ui'
 import { EmptyPanel, ErrorPanel, LoadingPanel } from '../components/ScreenState'
 import { Modal } from '../components/Modal'
+import { useI18n } from '../i18n/I18nProvider'
 
 interface FilterDraft {
   from: string
@@ -46,6 +47,7 @@ function statusBadge(item: RequestLogItem) {
 }
 
 export function LogsPage() {
+  const { tr } = useI18n()
   const [draft, setDraft] = useState<FilterDraft>(emptyFilters)
   const [filters, setFilters] = useState<FilterDraft>(emptyFilters)
   const [detail, setDetail] = useState<RequestLogDetail | null>(null)
@@ -83,7 +85,9 @@ export function LogsPage() {
     try {
       setDetail(await getRequestDetail(item.request_id))
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.detail : '读取请求详情失败')
+      setActionError(
+        err instanceof ApiError ? err.detail : tr('读取请求详情失败', 'Failed to load request details'),
+      )
     } finally {
       setDetailLoading(false)
     }
@@ -105,22 +109,25 @@ export function LogsPage() {
         'requests.csv',
       )
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : '导出失败')
+      setActionError(err instanceof Error ? err.message : tr('导出失败', 'Export failed'))
     }
   }
 
   return (
     <>
       <PageHead
-        title="请求日志"
-        desc="请求元数据、状态与耗时；不含正文/headers/凭证。"
+        title={tr('请求日志', 'Request logs')}
+        desc={tr(
+          '请求元数据、状态与耗时；不含正文/headers/凭证。',
+          'Request metadata, status, and latency. No body, headers, or credentials.',
+        )}
         actions={
           <>
             <button className="btn" type="button" onClick={reload} disabled={loading}>
-              {loading ? '刷新中…' : '刷新'}
+              {loading ? tr('刷新中…', 'Refreshing…') : tr('刷新', 'Refresh')}
             </button>
             <button className="btn" type="button" onClick={() => void handleExport()}>
-              导出 CSV
+              {tr('导出 CSV', 'Export CSV')}
             </button>
           </>
         }
@@ -130,7 +137,7 @@ export function LogsPage() {
         <form className="grid" onSubmit={applyFilters}>
           <div className="grid cols-3">
             <div className="field">
-              <label htmlFor="log-from">开始时间</label>
+              <label htmlFor="log-from">{tr('开始时间', 'Start time')}</label>
               <input
                 id="log-from"
                 className="input"
@@ -140,7 +147,7 @@ export function LogsPage() {
               />
             </div>
             <div className="field">
-              <label htmlFor="log-to">结束时间</label>
+              <label htmlFor="log-to">{tr('结束时间', 'End time')}</label>
               <input
                 id="log-to"
                 className="input"
@@ -150,14 +157,14 @@ export function LogsPage() {
               />
             </div>
             <div className="field">
-              <label htmlFor="log-status">状态类</label>
+              <label htmlFor="log-status">{tr('状态类', 'Status class')}</label>
               <select
                 id="log-status"
                 className="select"
                 value={draft.status_class}
                 onChange={(event) => setDraft({ ...draft, status_class: event.target.value })}
               >
-                <option value="">全部</option>
+                <option value="">{tr('全部', 'All')}</option>
                 <option value="2xx">2xx</option>
                 <option value="3xx">3xx</option>
                 <option value="4xx">4xx</option>
@@ -167,17 +174,17 @@ export function LogsPage() {
           </div>
           <div className="grid cols-4">
             <div className="field">
-              <label htmlFor="log-model">模型</label>
+              <label htmlFor="log-model">{tr('模型', 'Model')}</label>
               <input
                 id="log-model"
                 className="input"
-                placeholder="对外模型名"
+                placeholder={tr('对外模型名', 'Public model name')}
                 value={draft.model}
                 onChange={(event) => setDraft({ ...draft, model: event.target.value })}
               />
             </div>
             <div className="field">
-              <label htmlFor="log-provider">供应商</label>
+              <label htmlFor="log-provider">{tr('供应商', 'Provider')}</label>
               <input
                 id="log-provider"
                 className="input"
@@ -186,7 +193,7 @@ export function LogsPage() {
               />
             </div>
             <div className="field">
-              <label htmlFor="log-key-prefix">Key 前缀</label>
+              <label htmlFor="log-key-prefix">{tr('Key 前缀', 'Key prefix')}</label>
               <input
                 id="log-key-prefix"
                 className="input"
@@ -207,12 +214,17 @@ export function LogsPage() {
           </div>
           <div className="row">
             <button className="btn primary" type="submit">
-              查询
+              {tr('查询', 'Search')}
             </button>
             <button className="btn" type="button" onClick={resetFilters}>
-              重置
+              {tr('重置', 'Reset')}
             </button>
-            <span className="hint">默认最近 7 天；limit 100，导出上限由服务端控制。</span>
+            <span className="hint">
+              {tr(
+                '默认最近 7 天；limit 100，导出上限由服务端控制。',
+                'Defaults to the last 7 days; limit 100. Export size is capped by the server.',
+              )}
+            </span>
           </div>
         </form>
       </div>
@@ -224,23 +236,29 @@ export function LogsPage() {
       )}
 
       {loading && !data ? (
-        <LoadingPanel title="正在读取请求日志…" />
+        <LoadingPanel title={tr('正在读取请求日志…', 'Loading request logs…')} />
       ) : error ? (
         <ErrorPanel error={error} onRetry={reload} />
       ) : !data || data.items.length === 0 ? (
-        <EmptyPanel title="没有匹配的请求" desc="调整时间范围/筛选条件；尚未产生流量时也会为空。" />
+        <EmptyPanel
+          title={tr('没有匹配的请求', 'No matching requests')}
+          desc={tr(
+            '调整时间范围/筛选条件；尚未产生流量时也会为空。',
+            'Adjust the time range or filters. This list is also empty when no traffic has been recorded.',
+          )}
+        />
       ) : (
         <div className="table-wrap">
           <table className="table dense">
             <thead>
               <tr>
-                <th>时间</th>
-                <th>状态 / 耗时</th>
-                <th>模型</th>
-                <th>路径</th>
-                <th>供应商</th>
-                <th>Key / 用户</th>
-                <th>请求 ID</th>
+                <th>{tr('时间', 'Time')}</th>
+                <th>{tr('状态 / 耗时', 'Status / Latency')}</th>
+                <th>{tr('模型', 'Model')}</th>
+                <th>{tr('路径', 'Path')}</th>
+                <th>{tr('供应商', 'Provider')}</th>
+                <th>{tr('Key / 用户', 'Key / User')}</th>
+                <th>{tr('请求 ID', 'Request ID')}</th>
                 <th></th>
               </tr>
             </thead>
@@ -275,7 +293,7 @@ export function LogsPage() {
                   </td>
                   <td>
                     <button className="btn sm" type="button" onClick={() => void openDetail(item)}>
-                      详情
+                      {tr('详情', 'Details')}
                     </button>
                   </td>
                 </tr>
@@ -283,54 +301,57 @@ export function LogsPage() {
             </tbody>
           </table>
           <div className="hint" style={{ padding: '8px 12px' }}>
-            共 {data.total} 条（最多显示 100 条，导出使用同筛选）
+            {tr(
+              `共 ${data.total} 条（最多显示 100 条，导出使用同筛选）`,
+              `Total: ${data.total} rows (up to 100 shown; export uses the same filters)`,
+            )}
           </div>
         </div>
       )}
 
       {detailLoading && (
-        <Modal title="请求详情" onClose={() => setDetailLoading(false)}>
-          <LoadingPanel title="正在读取详情…" />
+        <Modal title={tr('请求详情', 'Request details')} onClose={() => setDetailLoading(false)}>
+          <LoadingPanel title={tr('正在读取详情…', 'Loading details…')} />
         </Modal>
       )}
 
       {detail && (
-        <Modal title="请求详情" onClose={() => setDetail(null)} wide>
+        <Modal title={tr('请求详情', 'Request details')} onClose={() => setDetail(null)} wide>
           <dl className="kv">
             <dt>request_id</dt>
             <dd>
               <code className="kbd">{detail.request_id}</code>
             </dd>
-            <dt>时间</dt>
+            <dt>{tr('时间', 'Time')}</dt>
             <dd>{new Date(detail.created_at).toLocaleString('zh-CN')}</dd>
-            <dt>路径 / 协议</dt>
+            <dt>{tr('路径 / 协议', 'Path / Protocol')}</dt>
             <dd>
               {detail.method} {detail.path} · {detail.protocol}
             </dd>
-            <dt>模型</dt>
+            <dt>{tr('模型', 'Model')}</dt>
             <dd>
               {detail.model_alias ?? '—'} → {detail.upstream_model ?? '—'}
             </dd>
-            <dt>供应商 / adapter</dt>
+            <dt>{tr('供应商 / adapter', 'Provider / adapter')}</dt>
             <dd>
               {detail.provider ?? '—'} · {detail.adapter ?? '—'}
             </dd>
-            <dt>状态 / 耗时</dt>
+            <dt>{tr('状态 / 耗时', 'Status / Latency')}</dt>
             <dd>
               {detail.status_code ?? '—'} · {detail.latency_ms}ms
               {detail.ttft_ms !== null ? ` · TTFT ${detail.ttft_ms}ms` : ''}
             </dd>
             <dt>attempt / fallback</dt>
             <dd>
-              {detail.attempt_count} · {detail.fallback ? '是' : '否'}
+              {detail.attempt_count} · {detail.fallback ? tr('是', 'Yes') : tr('否', 'No')}
             </dd>
-            <dt>错误码</dt>
+            <dt>{tr('错误码', 'Error code')}</dt>
             <dd>{detail.error_code ?? '—'}</dd>
-            <dt>用户 / 设备 / Key</dt>
+            <dt>{tr('用户 / 设备 / Key', 'User / Device / Key')}</dt>
             <dd>
               {detail.user_id ?? '—'} / {detail.device_id ?? '—'} / {detail.key_prefix ?? '—'}
             </dd>
-            <dt>客户端 IP / UA</dt>
+            <dt>{tr('客户端 IP / UA', 'Client IP / UA')}</dt>
             <dd>
               {detail.client_ip ?? '—'}
               <div className="hint">{detail.user_agent || '—'}</div>
@@ -338,7 +359,10 @@ export function LogsPage() {
             <dt>usage</dt>
             <dd>
               {detail.usage
-                ? `输入 ${detail.usage.input_tokens} · 输出 ${detail.usage.output_tokens} · ${detail.usage.cost} ${detail.usage.currency}（${detail.usage.usage_source}）`
+                ? tr(
+                    `输入 ${detail.usage.input_tokens} · 输出 ${detail.usage.output_tokens} · ${detail.usage.cost} ${detail.usage.currency}（${detail.usage.usage_source}）`,
+                    `Input ${detail.usage.input_tokens} · Output ${detail.usage.output_tokens} · ${detail.usage.cost} ${detail.usage.currency} (${detail.usage.usage_source})`,
+                  )
                 : '—'}
             </dd>
           </dl>

@@ -3,6 +3,8 @@ import type { FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ApiError } from '../api/client'
 import { useAuth } from '../auth/AuthProvider'
+import { useI18n } from '../i18n/I18nProvider'
+import { LocaleSwitch } from '../i18n/LocaleSwitch'
 
 interface LoginState {
   email?: string
@@ -18,6 +20,7 @@ export function LoginPage() {
   const auth = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const { tr } = useI18n()
   const state = (location.state ?? null) as LoginState | null
   const [email, setEmail] = useState(state?.email ?? '')
   const [password, setPassword] = useState('')
@@ -30,7 +33,7 @@ export function LoginPage() {
     setFormError(null)
     setFieldErrors({})
     if (!email.trim() || !password) {
-      setFormError('请输入邮箱和密码')
+      setFormError(tr('请输入邮箱和密码', 'Enter your email and password'))
       return
     }
     setSubmitting(true)
@@ -41,17 +44,19 @@ export function LoginPage() {
       if (error instanceof ApiError) {
         setFieldErrors(error.errors)
         if (error.status === 429) {
-          const wait = error.retryAfterSeconds ? `，请 ${error.retryAfterSeconds} 秒后重试` : '，请稍后重试'
-          setFormError(`登录尝试过于频繁${wait}`)
+          const wait = error.retryAfterSeconds
+            ? tr(`，请 ${error.retryAfterSeconds} 秒后重试`, `. Try again in ${error.retryAfterSeconds} seconds.`)
+            : tr('，请稍后重试', '. Try again later.')
+          setFormError(`${tr('登录尝试过于频繁', 'Too many sign-in attempts')}${wait}`)
         } else if (error.status === 401) {
-          setFormError('邮箱或密码不正确')
+          setFormError(tr('邮箱或密码不正确', 'Incorrect email or password'))
         } else if (error.status === 403) {
           setFormError(error.detail)
         } else {
           setFormError(error.detail)
         }
       } else {
-        setFormError('登录失败，请重试')
+        setFormError(tr('登录失败，请重试', 'Sign-in failed. Try again.'))
       }
     } finally {
       setSubmitting(false)
@@ -61,12 +66,18 @@ export function LoginPage() {
   return (
     <div className="login-wrap">
       <div className="login-card">
-        <h1>gw admin</h1>
-        <p>管理员登录</p>
-        {state?.created && <div className="note" style={{ marginBottom: 14 }}>管理员已创建，请登录。</div>}
+        <div className="login-locale"><LocaleSwitch /></div>
+        <img className="login-logo" src="/logo.svg" alt="Orveil" />
+        <h1>Orveil Console</h1>
+        <p>{tr('企业 AI 网关控制台 · 管理员登录', 'Enterprise AI Gateway · Administrator sign-in')}</p>
+        {state?.created && (
+          <div className="note" style={{ marginBottom: 14 }}>
+            {tr('管理员已创建，请登录。', 'Administrator created. Please sign in.')}
+          </div>
+        )}
         <form className="grid" onSubmit={(event) => void handleSubmit(event)} noValidate>
           <div className="field">
-            <label htmlFor="login-email">邮箱</label>
+            <label htmlFor="login-email">{tr('邮箱', 'Email')}</label>
             <input
               id="login-email"
               className="input"
@@ -79,7 +90,7 @@ export function LoginPage() {
             {fieldErrors.email && <span className="field-error">{fieldErrors.email}</span>}
           </div>
           <div className="field">
-            <label htmlFor="login-password">密码</label>
+            <label htmlFor="login-password">{tr('密码', 'Password')}</label>
             <input
               id="login-password"
               className="input"
@@ -96,9 +107,14 @@ export function LoginPage() {
             </div>
           )}
           <button className="btn primary" type="submit" disabled={submitting}>
-            {submitting ? '登录中…' : '登录'}
+            {submitting ? tr('登录中…', 'Signing in…') : tr('登录', 'Sign in')}
           </button>
-          <span className="hint">Cookie Session + CSRF；登录失败不会透露账号是否存在。</span>
+          <span className="hint">
+            {tr(
+              'Cookie Session + CSRF；登录失败不会透露账号是否存在。',
+              'Cookie session + CSRF; failed sign-ins never reveal whether an account exists.',
+            )}
+          </span>
         </form>
       </div>
     </div>

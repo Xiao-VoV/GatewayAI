@@ -28,11 +28,12 @@ import { useAsync } from '../api/useAsync'
 import { Badge, PageHead } from '../components/ui'
 import { ErrorPanel, LoadingPanel } from '../components/ScreenState'
 import { ConfirmDialog, Modal } from '../components/Modal'
+import { useI18n } from '../i18n/I18nProvider'
 
-function groupStatusBadge(status: string) {
-  if (status === 'active') return <Badge tone="ok">启用</Badge>
-  if (status === 'draft') return <Badge tone="warn">草稿</Badge>
-  return <Badge>已归档</Badge>
+function groupStatusBadge(status: string, tr: (zh: string, en: string) => string) {
+  if (status === 'active') return <Badge tone="ok">{tr('启用', 'Active')}</Badge>
+  if (status === 'draft') return <Badge tone="warn">{tr('草稿', 'Draft')}</Badge>
+  return <Badge>{tr('已归档', 'Archived')}</Badge>
 }
 
 interface EditDraft {
@@ -97,6 +98,7 @@ const emptyDeployment: DeploymentDraft = {
 export function ModelDetailPage() {
   const { groupId = '' } = useParams()
   const navigate = useNavigate()
+  const { tr } = useI18n()
   const { data, loading, error, reload } = useAsync(
     () =>
       Promise.all([
@@ -207,7 +209,7 @@ export function ModelDetailPage() {
         setEditErrors(err.errors)
         setActionError(err.detail)
       } else {
-        setActionError('更新模型组失败')
+        setActionError(tr('更新模型组失败', 'Failed to update the model group'))
       }
     } finally {
       setBusy(null)
@@ -245,7 +247,7 @@ export function ModelDetailPage() {
         setDeploymentErrors(err.errors)
         setActionError(err.detail)
       } else {
-        setActionError('添加部署失败')
+        setActionError(tr('添加部署失败', 'Failed to add the deployment'))
       }
     } finally {
       setBusy(null)
@@ -259,7 +261,7 @@ export function ModelDetailPage() {
       await patchDeployment(deployment.id, { enabled: !deployment.enabled })
       reload()
     } catch (err) {
-      handleError(err, '更新部署失败')
+      handleError(err, tr('更新部署失败', 'Failed to update the deployment'))
     } finally {
       setBusy(null)
     }
@@ -274,7 +276,7 @@ export function ModelDetailPage() {
       setDeleteDeploymentTarget(null)
       reload()
     } catch (err) {
-      handleError(err, '删除部署失败')
+      handleError(err, tr('删除部署失败', 'Failed to remove the deployment'))
     } finally {
       setBusy(null)
     }
@@ -352,7 +354,7 @@ export function ModelDetailPage() {
         setPublicationErrors(err.errors)
         setActionError(err.detail)
       } else {
-        setActionError('保存发布失败')
+        setActionError(tr('保存发布失败', 'Failed to save the publication'))
       }
     } finally {
       setBusy(null)
@@ -368,7 +370,7 @@ export function ModelDetailPage() {
       })
       reload()
     } catch (err) {
-      handleError(err, '更新发布状态失败')
+      handleError(err, tr('更新发布状态失败', 'Failed to update publication status'))
     } finally {
       setBusy(null)
     }
@@ -383,7 +385,7 @@ export function ModelDetailPage() {
       setDeletePublicationTarget(null)
       reload()
     } catch (err) {
-      handleError(err, '删除发布失败')
+      handleError(err, tr('删除发布失败', 'Failed to delete the publication'))
     } finally {
       setBusy(null)
     }
@@ -396,7 +398,7 @@ export function ModelDetailPage() {
       await archiveModelGroup(groupId)
       navigate('/models', { replace: true })
     } catch (err) {
-      handleError(err, '归档模型组失败')
+      handleError(err, tr('归档模型组失败', 'Failed to archive the model group'))
       setArchiveOpen(false)
     } finally {
       setBusy(null)
@@ -406,15 +408,21 @@ export function ModelDetailPage() {
   if (loading && !data) {
     return (
       <>
-        <PageHead title="模型组详情" actions={<Link className="btn" to="/models">返回目录</Link>} />
-        <LoadingPanel title="正在读取模型组…" />
+        <PageHead
+          title={tr('模型组详情', 'Model group detail')}
+          actions={<Link className="btn" to="/models">{tr('返回目录', 'Back to catalog')}</Link>}
+        />
+        <LoadingPanel title={tr('正在读取模型组…', 'Loading model group…')} />
       </>
     )
   }
   if (error) {
     return (
       <>
-        <PageHead title="模型组详情" actions={<Link className="btn" to="/models">返回目录</Link>} />
+        <PageHead
+          title={tr('模型组详情', 'Model group detail')}
+          actions={<Link className="btn" to="/models">{tr('返回目录', 'Back to catalog')}</Link>}
+        />
         <ErrorPanel error={error} onRetry={reload} />
       </>
     )
@@ -426,18 +434,21 @@ export function ModelDetailPage() {
   return (
     <>
       <PageHead
-        title={`模型组 · ${group.client_model_name}`}
-        desc="部署、权重与路由预览；发布/工具默认在后续切片。"
+        title={`${tr('模型组', 'Model group')} · ${group.client_model_name}`}
+        desc={tr(
+          '部署、权重与路由预览；发布/工具默认在后续切片。',
+          'Deployments, weights, and route preview; publishing and tool defaults arrive in later slices.',
+        )}
         actions={
           <>
             <Link className="btn" to="/models">
-              返回目录
+              {tr('返回目录', 'Back to catalog')}
             </Link>
             <button className="btn" type="button" onClick={openEdit}>
-              编辑
+              {tr('编辑', 'Edit')}
             </button>
             <button className="btn primary" type="button" onClick={openDeployment} disabled={providers.items.length === 0}>
-              添加部署
+              {tr('添加部署', 'Add deployment')}
             </button>
           </>
         }
@@ -452,34 +463,34 @@ export function ModelDetailPage() {
       <div className="grid cols-2">
         <div className="card">
           <div className="row between">
-            <h3>基础信息</h3>
-            {groupStatusBadge(group.status)}
+            <h3>{tr('基础信息', 'Basic info')}</h3>
+            {groupStatusBadge(group.status, tr)}
           </div>
           <dl className="kv" style={{ marginTop: 10 }}>
-            <dt>对外模型名</dt>
+            <dt>{tr('对外模型名', 'Client model')}</dt>
             <dd>
               <strong>{group.client_model_name}</strong>
             </dd>
-            <dt>显示名</dt>
+            <dt>{tr('显示名', 'Display name')}</dt>
             <dd>{group.display_name || '—'}</dd>
             <dt>Canonical</dt>
             <dd>{group.canonical}</dd>
-            <dt>能力 / 协议</dt>
+            <dt>{tr('能力 / 协议', 'Capabilities / protocols')}</dt>
             <dd>
               {group.capabilities.join(', ') || '—'} / {group.protocols.join(', ') || '—'}
             </dd>
-            <dt>上下文 / 输出</dt>
+            <dt>{tr('上下文 / 输出', 'Context / output')}</dt>
             <dd>
               {group.context_window ?? '—'} / {group.max_output ?? '—'}
             </dd>
-            <dt>发布</dt>
+            <dt>{tr('发布', 'Publication')}</dt>
             <dd>
               {group.publications.length === 0 ? (
-                <span className="hint">未发布</span>
+                <span className="hint">{tr('未发布', 'Not published')}</span>
               ) : (
                 group.publications.map((pub) => (
                   <Badge key={pub.id} tone={pub.status === 'active' ? 'ok' : 'warn'}>
-                    {pub.status} · {pub.target_count} 对象
+                    {pub.status} · {pub.target_count}{tr(' 对象', ' targets')}
                   </Badge>
                 ))
               )}
@@ -488,14 +499,17 @@ export function ModelDetailPage() {
         </div>
         <div className="card">
           <div className="row between">
-            <h3>路由预览</h3>
+            <h3>{tr('路由预览', 'Route preview')}</h3>
             <Badge tone={preview.candidates.length > 0 ? 'ok' : 'warn'}>
-              {preview.candidates.length} 个候选
+              {preview.candidates.length}{tr(' 个候选', ' candidates')}
             </Badge>
           </div>
           {preview.candidates.length === 0 ? (
             <p className="sub" style={{ marginTop: 10 }}>
-              没有可用候选；添加启用部署并激活后才会进入路由。
+              {tr(
+                '没有可用候选；添加启用部署并激活后才会进入路由。',
+                'No candidates available. Add an enabled deployment and activate the group to enter routing.',
+              )}
             </p>
           ) : (
             <div style={{ marginTop: 10 }}>
@@ -520,9 +534,9 @@ export function ModelDetailPage() {
       <div className="card">
         <div className="row between">
           <div className="row">
-            <h3>部署</h3>
+            <h3>{tr('部署', 'Deployments')}</h3>
             <span className="sub">
-              {group.enabled_deployment_count}/{group.deployment_count} 启用
+              {group.enabled_deployment_count}/{group.deployment_count} {tr('启用', 'enabled')}
             </span>
           </div>
         </div>
@@ -530,13 +544,13 @@ export function ModelDetailPage() {
           <table className="table dense">
             <thead>
               <tr>
-                <th>上游模型</th>
-                <th>供应商 / 账号</th>
-                <th>优先级</th>
-                <th>权重</th>
-                <th>状态</th>
-                <th>健康</th>
-                <th className="cell-actions">操作</th>
+                <th>{tr('上游模型', 'Upstream model')}</th>
+                <th>{tr('供应商 / 账号', 'Provider / account')}</th>
+                <th>{tr('优先级', 'Priority')}</th>
+                <th>{tr('权重', 'Weight')}</th>
+                <th>{tr('状态', 'Status')}</th>
+                <th>{tr('健康', 'Health')}</th>
+                <th className="cell-actions">{tr('操作', 'Actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -555,7 +569,9 @@ export function ModelDetailPage() {
                   <td className="num">{deployment.priority}</td>
                   <td className="num">{deployment.weight}%</td>
                   <td>
-                    <Badge tone={deployment.enabled ? 'ok' : ''}>{deployment.enabled ? '启用' : '停用'}</Badge>
+                    <Badge tone={deployment.enabled ? 'ok' : ''}>
+                      {deployment.enabled ? tr('启用', 'Enabled') : tr('停用', 'Disabled')}
+                    </Badge>
                   </td>
                   <td>
                     <Badge tone={deployment.provider_status === 'active' ? 'ok' : 'warn'}>
@@ -570,10 +586,10 @@ export function ModelDetailPage() {
                         disabled={busy !== null}
                         onClick={() => void toggleDeployment(deployment)}
                       >
-                        {deployment.enabled ? '停用' : '启用'}
+                        {deployment.enabled ? tr('停用', 'Disable') : tr('启用', 'Enable')}
                       </button>
                       <button className="btn sm danger" type="button" onClick={() => setDeleteDeploymentTarget(deployment)}>
-                        移除
+                        {tr('移除', 'Remove')}
                       </button>
                     </span>
                   </td>
@@ -582,7 +598,10 @@ export function ModelDetailPage() {
               {group.deployments.length === 0 && (
                 <tr>
                   <td colSpan={7} className="hint">
-                    还没有部署；添加至少一个启用部署后才能激活/发布。
+                    {tr(
+                      '还没有部署；添加至少一个启用部署后才能激活/发布。',
+                      'No deployments yet. Add at least one enabled deployment before activating or publishing.',
+                    )}
                   </td>
                 </tr>
               )}
@@ -594,8 +613,13 @@ export function ModelDetailPage() {
       <div className="card">
         <div className="row between">
           <div className="row">
-            <h3>发布</h3>
-            <span className="sub">{publications.length} 条 · 工具默认引用 {group.tool_default_count}</span>
+            <h3>{tr('发布', 'Publications')}</h3>
+            <span className="sub">
+              {tr(
+                `${publications.length} 条 · 工具默认引用 ${group.tool_default_count}`,
+                `${publications.length} publications · ${group.tool_default_count} tool defaults`,
+              )}
+            </span>
           </div>
           <button
             className="btn sm primary"
@@ -603,24 +627,27 @@ export function ModelDetailPage() {
             onClick={openCreatePublication}
             disabled={group.status !== 'active' || group.enabled_deployment_count === 0}
           >
-            新建发布
+            {tr('新建发布', 'New publication')}
           </button>
         </div>
         {group.status !== 'active' && (
           <p className="hint" style={{ marginTop: 6 }}>
-            模型组需先激活且至少 1 个启用部署，才能创建发布。
+            {tr(
+              '模型组需先激活且至少 1 个启用部署，才能创建发布。',
+              'Activate the model group with at least one enabled deployment before creating a publication.',
+            )}
           </p>
         )}
         <div className="table-wrap" style={{ marginTop: 10 }}>
           <table className="table dense">
             <thead>
               <tr>
-                <th>状态</th>
-                <th>发布对象</th>
-                <th>可见 / 可用</th>
-                <th>配额</th>
-                <th>备注</th>
-                <th className="cell-actions">操作</th>
+                <th>{tr('状态', 'Status')}</th>
+                <th>{tr('发布对象', 'Targets')}</th>
+                <th>{tr('可见 / 可用', 'Visible / allowed')}</th>
+                <th>{tr('配额', 'Quota')}</th>
+                <th>{tr('备注', 'Note')}</th>
+                <th className="cell-actions">{tr('操作', 'Actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -631,7 +658,7 @@ export function ModelDetailPage() {
                   <tr key={publication.id}>
                     <td>
                       <Badge tone={publication.status === 'active' ? 'ok' : 'warn'}>
-                        {publication.status === 'active' ? '生效' : '暂停'}
+                        {publication.status === 'active' ? tr('生效', 'Active') : tr('暂停', 'Paused')}
                       </Badge>
                     </td>
                     <td>
@@ -640,10 +667,10 @@ export function ModelDetailPage() {
                         : publication.targets
                             .map((target) =>
                               target.subject_type === 'all_users'
-                                ? '全部用户'
+                                ? tr('全部用户', 'All users')
                                 : target.subject_label ?? target.subject_type,
                             )
-                            .join('、')}
+                            .join(tr('、', ', '))}
                     </td>
                     <td className="num">
                       {visible} / {allowed}
@@ -660,13 +687,13 @@ export function ModelDetailPage() {
                           onClick={() => void togglePublication(publication)}
                           disabled={busy !== null}
                         >
-                          {publication.status === 'active' ? '暂停' : '恢复'}
+                          {publication.status === 'active' ? tr('暂停', 'Pause') : tr('恢复', 'Resume')}
                         </button>
                         <button className="btn sm" type="button" onClick={() => openEditPublication(publication)}>
-                          编辑
+                          {tr('编辑', 'Edit')}
                         </button>
                         <button className="btn sm danger" type="button" onClick={() => setDeletePublicationTarget(publication)}>
-                          删除
+                          {tr('删除', 'Delete')}
                         </button>
                       </span>
                     </td>
@@ -676,7 +703,10 @@ export function ModelDetailPage() {
               {publications.length === 0 && (
                 <tr>
                   <td colSpan={6} className="hint">
-                    尚未发布；发布只对目标用户/用户组/全部用户投影可见目录。
+                    {tr(
+                      '尚未发布；发布只对目标用户/用户组/全部用户投影可见目录。',
+                      'Not published yet. A publication projects the visible catalog only to the target users, user groups, or all users.',
+                    )}
                   </td>
                 </tr>
               )}
@@ -684,33 +714,42 @@ export function ModelDetailPage() {
           </table>
         </div>
         <p className="hint" style={{ marginTop: 8 }}>
-          visible/allowed 强制生效；quota/data_level 目前仅配置展示（config_only）。工具默认与员工预览在后续切片。
+          {tr(
+            'visible/allowed 强制生效；quota/data_level 目前仅配置展示（config_only）。工具默认与员工预览在后续切片。',
+            'visible/allowed are enforced; quota/data_level are configuration-only (config_only) for now. Tool defaults and the employee preview arrive in later slices.',
+          )}
         </p>
       </div>
 
       <div className="card" style={{ borderColor: '#f3c7c2' }}>
-        <h3>危险操作</h3>
+        <h3>{tr('危险操作', 'Danger zone')}</h3>
         <p className="sub" style={{ marginTop: 4 }}>
-          归档后模型组不再出现在客户端目录/路由；已发布的组会立即不可见。
+          {tr(
+            '归档后模型组不再出现在客户端目录/路由；已发布的组会立即不可见。',
+            'Archived model groups no longer appear in the client catalog or routing; published groups become invisible immediately.',
+          )}
         </p>
         <button className="btn danger" type="button" onClick={() => setArchiveOpen(true)} style={{ marginTop: 10 }}>
-          归档模型组
+          {tr('归档模型组', 'Archive model group')}
         </button>
       </div>
 
       {publicationOpen && (
         <Modal
-          title={publicationEditId ? '编辑发布' : '新建发布'}
-          sub={`${group.client_model_name} · visible 是目录可见，allowed 是允许调用`}
+          title={publicationEditId ? tr('编辑发布', 'Edit publication') : tr('新建发布', 'New publication')}
+          sub={`${group.client_model_name} · ${tr(
+            'visible 是目录可见，allowed 是允许调用',
+            'visible controls catalog visibility, allowed controls invocation',
+          )}`}
           onClose={() => setPublicationOpen(false)}
           wide
           footer={
             <>
               <button className="btn" type="button" onClick={() => setPublicationOpen(false)} disabled={busy !== null}>
-                取消
+                {tr('取消', 'Cancel')}
               </button>
               <button className="btn primary" type="submit" form="publication-form" disabled={busy !== null}>
-                {busy === 'publication-save' ? '保存中…' : '保存发布'}
+                {busy === 'publication-save' ? tr('保存中…', 'Saving…') : tr('保存发布', 'Save publication')}
               </button>
             </>
           }
@@ -718,7 +757,7 @@ export function ModelDetailPage() {
           <form id="publication-form" className="grid" onSubmit={(event) => void handleSavePublication(event)} noValidate>
             <div className="grid cols-2">
               <div className="field">
-                <label htmlFor="publication-status">状态</label>
+                <label htmlFor="publication-status">{tr('状态', 'Status')}</label>
                 <select
                   id="publication-status"
                   className="select"
@@ -727,19 +766,19 @@ export function ModelDetailPage() {
                     setPublicationDraft({ ...publicationDraft, status: event.target.value as 'active' | 'paused' })
                   }
                 >
-                  <option value="active">生效</option>
-                  <option value="paused">暂停</option>
+                  <option value="active">{tr('生效', 'Active')}</option>
+                  <option value="paused">{tr('暂停', 'Paused')}</option>
                 </select>
               </div>
               <div className="field">
-                <label htmlFor="publication-data-level">数据等级上限</label>
+                <label htmlFor="publication-data-level">{tr('数据等级上限', 'Max data level')}</label>
                 <select
                   id="publication-data-level"
                   className="select"
                   value={publicationDraft.data_level_max}
                   onChange={(event) => setPublicationDraft({ ...publicationDraft, data_level_max: event.target.value })}
                 >
-                  <option value="">未限制</option>
+                  <option value="">{tr('未限制', 'Unlimited')}</option>
                   <option value="1">L1</option>
                   <option value="2">L2</option>
                   <option value="3">L3</option>
@@ -749,12 +788,12 @@ export function ModelDetailPage() {
             </div>
 
             <div className="field">
-              <label>发布对象</label>
+              <label>{tr('发布对象', 'Targets')}</label>
               {publicationDraft.targets.map((target, index) => (
                 <div key={index} className="card" style={{ boxShadow: 'none', padding: 12, marginBottom: 8 }}>
                   <div className="grid cols-3">
                     <div className="field">
-                      <label>类型</label>
+                      <label>{tr('类型', 'Type')}</label>
                       <select
                         className="select"
                         value={target.subject_type}
@@ -765,22 +804,22 @@ export function ModelDetailPage() {
                           })
                         }
                       >
-                        <option value="all_users">全部用户</option>
-                        <option value="user">指定用户</option>
-                        <option value="user_group">用户组</option>
+                        <option value="all_users">{tr('全部用户', 'All users')}</option>
+                        <option value="user">{tr('指定用户', 'Specific user')}</option>
+                        <option value="user_group">{tr('用户组', 'User group')}</option>
                       </select>
                     </div>
                     <div className="field">
-                      <label>对象</label>
+                      <label>{tr('对象', 'Target')}</label>
                       {target.subject_type === 'all_users' ? (
-                        <input className="input" value="全部用户" disabled />
+                        <input className="input" value={tr('全部用户', 'All users')} disabled />
                       ) : target.subject_type === 'user' ? (
                         <select
                           className="select"
                           value={target.subject_id}
                           onChange={(event) => updatePublicationTarget(index, { subject_id: event.target.value })}
                         >
-                          <option value="">选择用户</option>
+                          <option value="">{tr('选择用户', 'Select user')}</option>
                           {users.map((user) => (
                             <option key={user.id} value={user.id}>
                               {user.display_name || user.email} · {user.email}
@@ -793,17 +832,17 @@ export function ModelDetailPage() {
                           value={target.subject_id}
                           onChange={(event) => updatePublicationTarget(index, { subject_id: event.target.value })}
                         >
-                          <option value="">选择用户组</option>
+                          <option value="">{tr('选择用户组', 'Select user group')}</option>
                           {groups.map((groupOption) => (
                             <option key={groupOption.id} value={groupOption.id}>
-                              {groupOption.name} · {groupOption.member_count} 人
+                              {groupOption.name} · {groupOption.member_count}{tr(' 人', ' members')}
                             </option>
                           ))}
                         </select>
                       )}
                     </div>
                     <div className="field">
-                      <label>权限</label>
+                      <label>{tr('权限', 'Permissions')}</label>
                       <div className="row" style={{ height: 32 }}>
                         <label className="chk">
                           <input
@@ -816,7 +855,7 @@ export function ModelDetailPage() {
                               })
                             }
                           />
-                          可见
+                          {tr('可见', 'Visible')}
                         </label>
                         <label className="chk">
                           <input
@@ -829,7 +868,7 @@ export function ModelDetailPage() {
                               })
                             }
                           />
-                          可用
+                          {tr('可用', 'Allowed')}
                         </label>
                       </div>
                     </div>
@@ -845,7 +884,7 @@ export function ModelDetailPage() {
                     }
                     disabled={publicationDraft.targets.length === 1}
                   >
-                    移除对象
+                    {tr('移除对象', 'Remove target')}
                   </button>
                 </div>
               ))}
@@ -862,7 +901,7 @@ export function ModelDetailPage() {
                   }))
                 }
               >
-                添加对象
+                {tr('添加对象', 'Add target')}
               </button>
               {publicationErrors.targets && <span className="field-error">{publicationErrors.targets}</span>}
             </div>
@@ -874,7 +913,7 @@ export function ModelDetailPage() {
                   id="publication-rpm"
                   className="input"
                   type="number"
-                  placeholder="可选"
+                  placeholder={tr('可选', 'Optional')}
                   value={publicationDraft.quota_rpm}
                   onChange={(event) => setPublicationDraft({ ...publicationDraft, quota_rpm: event.target.value })}
                 />
@@ -885,18 +924,18 @@ export function ModelDetailPage() {
                   id="publication-tpm"
                   className="input"
                   type="number"
-                  placeholder="可选"
+                  placeholder={tr('可选', 'Optional')}
                   value={publicationDraft.quota_tpm}
                   onChange={(event) => setPublicationDraft({ ...publicationDraft, quota_tpm: event.target.value })}
                 />
               </div>
               <div className="field">
-                <label htmlFor="publication-daily">quota 日请求</label>
+                <label htmlFor="publication-daily">{tr('quota 日请求', 'Daily request quota')}</label>
                 <input
                   id="publication-daily"
                   className="input"
                   type="number"
-                  placeholder="可选"
+                  placeholder={tr('可选', 'Optional')}
                   value={publicationDraft.quota_daily_requests}
                   onChange={(event) =>
                     setPublicationDraft({ ...publicationDraft, quota_daily_requests: event.target.value })
@@ -905,7 +944,7 @@ export function ModelDetailPage() {
               </div>
             </div>
             <div className="field">
-              <label htmlFor="publication-note">备注</label>
+              <label htmlFor="publication-note">{tr('备注', 'Note')}</label>
               <input
                 id="publication-note"
                 className="input"
@@ -913,7 +952,12 @@ export function ModelDetailPage() {
                 onChange={(event) => setPublicationDraft({ ...publicationDraft, note: event.target.value })}
               />
             </div>
-            <p className="hint">quota 与数据等级当前仅配置（config_only），不在此版本强制执行。</p>
+            <p className="hint">
+              {tr(
+                'quota 与数据等级当前仅配置（config_only），不在此版本强制执行。',
+                'Quota and data level are configuration-only (config_only) and are not enforced in this version.',
+              )}
+            </p>
             {actionError && (
               <div className="form-error" role="alert">
                 {actionError}
@@ -925,9 +969,16 @@ export function ModelDetailPage() {
 
       {deletePublicationTarget && (
         <ConfirmDialog
-          title="删除发布？"
-          desc={<p>删除后该模型组回到未发布状态，客户端目录/调用立即不可见。操作写入审计。</p>}
-          confirmText="删除"
+          title={tr('删除发布？', 'Delete publication?')}
+          desc={
+            <p>
+              {tr(
+                '删除后该模型组回到未发布状态，客户端目录/调用立即不可见。操作写入审计。',
+                'The model group returns to an unpublished state and immediately disappears from the client catalog and invocation. This action is audited.',
+              )}
+            </p>
+          }
+          confirmText={tr('删除', 'Delete')}
           danger
           busy={busy === 'publication-delete'}
           onCancel={() => setDeletePublicationTarget(null)}
@@ -937,16 +988,16 @@ export function ModelDetailPage() {
 
       {editOpen && editDraft && (
         <Modal
-          title="编辑模型组"
+          title={tr('编辑模型组', 'Edit model group')}
           onClose={() => setEditOpen(false)}
           wide
           footer={
             <>
               <button className="btn" type="button" onClick={() => setEditOpen(false)} disabled={busy !== null}>
-                取消
+                {tr('取消', 'Cancel')}
               </button>
               <button className="btn primary" type="submit" form="edit-group-form" disabled={busy !== null}>
-                {busy === 'edit' ? '保存中…' : '保存'}
+                {busy === 'edit' ? tr('保存中…', 'Saving…') : tr('保存', 'Save')}
               </button>
             </>
           }
@@ -954,7 +1005,7 @@ export function ModelDetailPage() {
           <form id="edit-group-form" className="grid" onSubmit={(event) => void handleEdit(event)} noValidate>
             <div className="grid cols-2">
               <div className="field">
-                <label htmlFor="edit-client-name">对外模型名</label>
+                <label htmlFor="edit-client-name">{tr('对外模型名', 'Client model')}</label>
                 <input
                   id="edit-client-name"
                   className="input"
@@ -964,7 +1015,7 @@ export function ModelDetailPage() {
                 {editErrors.client_model_name && <span className="field-error">{editErrors.client_model_name}</span>}
               </div>
               <div className="field">
-                <label htmlFor="edit-display-name">显示名</label>
+                <label htmlFor="edit-display-name">{tr('显示名', 'Display name')}</label>
                 <input
                   id="edit-display-name"
                   className="input"
@@ -985,20 +1036,22 @@ export function ModelDetailPage() {
             </div>
             <div className="grid cols-2">
               <div className="field">
-                <label htmlFor="edit-status">状态</label>
+                <label htmlFor="edit-status">{tr('状态', 'Status')}</label>
                 <select
                   id="edit-status"
                   className="select"
                   value={editDraft.status}
                   onChange={(event) => setEditDraft({ ...editDraft, status: event.target.value })}
                 >
-                  <option value="draft">草稿</option>
-                  <option value="active">启用</option>
+                  <option value="draft">{tr('草稿', 'Draft')}</option>
+                  <option value="active">{tr('启用', 'Active')}</option>
                 </select>
-                <span className="hint">启用至少需要 1 个启用部署。</span>
+                <span className="hint">
+                  {tr('启用至少需要 1 个启用部署。', 'Activation requires at least one enabled deployment.')}
+                </span>
               </div>
               <div className="field">
-                <label htmlFor="edit-description">描述</label>
+                <label htmlFor="edit-description">{tr('描述', 'Description')}</label>
                 <input
                   id="edit-description"
                   className="input"
@@ -1009,7 +1062,7 @@ export function ModelDetailPage() {
             </div>
             <div className="grid cols-2">
               <div className="field">
-                <label htmlFor="edit-capabilities">能力（逗号分隔）</label>
+                <label htmlFor="edit-capabilities">{tr('能力（逗号分隔）', 'Capabilities (comma-separated)')}</label>
                 <input
                   id="edit-capabilities"
                   className="input"
@@ -1018,7 +1071,7 @@ export function ModelDetailPage() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="edit-protocols">协议（逗号分隔）</label>
+                <label htmlFor="edit-protocols">{tr('协议（逗号分隔）', 'Protocols (comma-separated)')}</label>
                 <input
                   id="edit-protocols"
                   className="input"
@@ -1029,7 +1082,7 @@ export function ModelDetailPage() {
             </div>
             <div className="grid cols-2">
               <div className="field">
-                <label htmlFor="edit-context">上下文窗口</label>
+                <label htmlFor="edit-context">{tr('上下文窗口', 'Context window')}</label>
                 <input
                   id="edit-context"
                   className="input"
@@ -1039,7 +1092,7 @@ export function ModelDetailPage() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="edit-max-output">最大输出</label>
+                <label htmlFor="edit-max-output">{tr('最大输出', 'Max output')}</label>
                 <input
                   id="edit-max-output"
                   className="input"
@@ -1060,14 +1113,14 @@ export function ModelDetailPage() {
 
       {deploymentOpen && (
         <Modal
-          title="添加部署"
-          sub="上游模型 × 渠道账号；同一组内唯一"
+          title={tr('添加部署', 'Add deployment')}
+          sub={tr('上游模型 × 渠道账号；同一组内唯一', 'Upstream model × provider account; unique within the group')}
           onClose={() => setDeploymentOpen(false)}
           wide
           footer={
             <>
               <button className="btn" type="button" onClick={() => setDeploymentOpen(false)} disabled={busy !== null}>
-                取消
+                {tr('取消', 'Cancel')}
               </button>
               <button
                 className="btn primary"
@@ -1075,14 +1128,14 @@ export function ModelDetailPage() {
                 form="create-deployment-form"
                 disabled={busy !== null || !deploymentDraft.accountId || !deploymentDraft.upstreamModelId}
               >
-                {busy === 'deployment-create' ? '保存中…' : '添加部署'}
+                {busy === 'deployment-create' ? tr('保存中…', 'Saving…') : tr('添加部署', 'Add deployment')}
               </button>
             </>
           }
         >
           <form id="create-deployment-form" className="grid" onSubmit={(event) => void handleCreateDeployment(event)} noValidate>
             <div className="field">
-              <label htmlFor="deploy-provider">供应商</label>
+              <label htmlFor="deploy-provider">{tr('供应商', 'Provider')}</label>
               <select
                 id="deploy-provider"
                 className="select"
@@ -1105,14 +1158,14 @@ export function ModelDetailPage() {
             </div>
             <div className="grid cols-2">
               <div className="field">
-                <label htmlFor="deploy-account">渠道账号</label>
+                <label htmlFor="deploy-account">{tr('渠道账号', 'Account')}</label>
                 <select
                   id="deploy-account"
                   className="select"
                   value={deploymentDraft.accountId}
                   onChange={(event) => setDeploymentDraft({ ...deploymentDraft, accountId: event.target.value })}
                 >
-                  <option value="">选择账号</option>
+                  <option value="">{tr('选择账号', 'Select account')}</option>
                   {options.data?.accounts.map((account) => (
                     <option key={account.id} value={account.id}>
                       {account.name} · {account.region || '—'} · {account.status}
@@ -1121,14 +1174,14 @@ export function ModelDetailPage() {
                 </select>
               </div>
               <div className="field">
-                <label htmlFor="deploy-model">上游模型</label>
+                <label htmlFor="deploy-model">{tr('上游模型', 'Upstream model')}</label>
                 <select
                   id="deploy-model"
                   className="select"
                   value={deploymentDraft.upstreamModelId}
                   onChange={(event) => setDeploymentDraft({ ...deploymentDraft, upstreamModelId: event.target.value })}
                 >
-                  <option value="">选择上游模型</option>
+                  <option value="">{tr('选择上游模型', 'Select upstream model')}</option>
                   {options.data?.models.map((model) => (
                     <option key={model.id} value={model.id}>
                       {model.name} · {model.canonical}
@@ -1137,16 +1190,30 @@ export function ModelDetailPage() {
                 </select>
               </div>
             </div>
-            {options.loading && <span className="hint">正在读取供应商账号/模型…</span>}
+            {options.loading && (
+              <span className="hint">
+                {tr('正在读取供应商账号/模型…', 'Loading provider accounts and models…')}
+              </span>
+            )}
             {!options.loading && options.data && options.data.accounts.length === 0 && (
-              <span className="hint">该供应商还没有账号；先在供应商详情添加账号。</span>
+              <span className="hint">
+                {tr(
+                  '该供应商还没有账号；先在供应商详情添加账号。',
+                  'This provider has no accounts yet. Add an account in the provider detail page first.',
+                )}
+              </span>
             )}
             {!options.loading && options.data && options.data.models.length === 0 && (
-              <span className="hint">该供应商还没有上游模型；先在供应商详情添加模型。</span>
+              <span className="hint">
+                {tr(
+                  '该供应商还没有上游模型；先在供应商详情添加模型。',
+                  'This provider has no upstream models yet. Add a model in the provider detail page first.',
+                )}
+              </span>
             )}
             <div className="grid cols-3">
               <div className="field">
-                <label htmlFor="deploy-priority">优先级</label>
+                <label htmlFor="deploy-priority">{tr('优先级', 'Priority')}</label>
                 <input
                   id="deploy-priority"
                   className="input"
@@ -1157,7 +1224,7 @@ export function ModelDetailPage() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="deploy-weight">权重 %</label>
+                <label htmlFor="deploy-weight">{tr('权重 %', 'Weight %')}</label>
                 <input
                   id="deploy-weight"
                   className="input"
@@ -1169,20 +1236,20 @@ export function ModelDetailPage() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="deploy-enabled">状态</label>
+                <label htmlFor="deploy-enabled">{tr('状态', 'Status')}</label>
                 <select
                   id="deploy-enabled"
                   className="select"
                   value={deploymentDraft.enabled ? '1' : '0'}
                   onChange={(event) => setDeploymentDraft({ ...deploymentDraft, enabled: event.target.value === '1' })}
                 >
-                  <option value="1">启用</option>
-                  <option value="0">停用</option>
+                  <option value="1">{tr('启用', 'Enabled')}</option>
+                  <option value="0">{tr('停用', 'Disabled')}</option>
                 </select>
               </div>
             </div>
             <div className="field">
-              <label htmlFor="deploy-notes">备注</label>
+              <label htmlFor="deploy-notes">{tr('备注', 'Note')}</label>
               <input
                 id="deploy-notes"
                 className="input"
@@ -1207,9 +1274,16 @@ export function ModelDetailPage() {
 
       {archiveOpen && (
         <ConfirmDialog
-          title="归档模型组？"
-          desc={<p>归档后不再出现在客户端目录/路由；已发布组会立即不可见。该操作写入审计。</p>}
-          confirmText="归档"
+          title={tr('归档模型组？', 'Archive model group?')}
+          desc={
+            <p>
+              {tr(
+                '归档后不再出现在客户端目录/路由；已发布组会立即不可见。该操作写入审计。',
+                'Archived groups no longer appear in the client catalog or routing; published groups become invisible immediately. This action is audited.',
+              )}
+            </p>
+          }
+          confirmText={tr('归档', 'Archive')}
           danger
           busy={busy === 'archive'}
           onCancel={() => setArchiveOpen(false)}
@@ -1219,9 +1293,16 @@ export function ModelDetailPage() {
 
       {deleteDeploymentTarget && (
         <ConfirmDialog
-          title="移除部署？"
-          desc={<p>从模型组移除该上游部署；不会删除供应商账号或上游模型。</p>}
-          confirmText="移除"
+          title={tr('移除部署？', 'Remove deployment?')}
+          desc={
+            <p>
+              {tr(
+                '从模型组移除该上游部署；不会删除供应商账号或上游模型。',
+                'Removes this upstream deployment from the model group; the provider account and upstream model are not deleted.',
+              )}
+            </p>
+          }
+          confirmText={tr('移除', 'Remove')}
           danger
           busy={busy === 'deployment-delete'}
           onCancel={() => setDeleteDeploymentTarget(null)}

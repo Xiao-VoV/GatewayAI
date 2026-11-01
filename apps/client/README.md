@@ -1,4 +1,4 @@
-# @gw/client — AI Gateway 客户端
+# Orveil Desktop — 桌面客户端
 
 独立客户端应用（React 19 + Vite + TypeScript + Tauri），只通过 HTTP 调用 `server/`，**不导入服务端代码**。
 

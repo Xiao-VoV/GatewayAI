@@ -2,7 +2,7 @@
   "name": "gatewayai",
   "private": true,
   "version": "0.1.0",
-  "description": "Open-source enterprise AI gateway: one OpenAI-compatible endpoint for every model.",
+  "description": "Orveil AI Gateway — one OpenAI-compatible endpoint for every model.",
   "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",

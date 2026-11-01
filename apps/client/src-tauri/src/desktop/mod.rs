@@ -14,7 +14,7 @@ pub fn show_main_window(app: &AppHandle) {
 
 pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
     let show = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "退出 gw client", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "退出 Orveil Desktop", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show, &quit])?;
     let icon = app
         .default_window_icon()
@@ -22,7 +22,7 @@ pub fn setup(app: &mut App) -> Result<(), Box<dyn std::error::Error>> {
         .ok_or_else(|| "缺少应用图标，无法创建托盘".to_string())?;
     TrayIconBuilder::with_id("main-tray")
         .icon(icon)
-        .tooltip("gw client · AI Gateway")
+        .tooltip("Orveil AI Gateway")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {

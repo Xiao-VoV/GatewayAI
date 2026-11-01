@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ApiError } from './client'
+import { ApiError, apiText } from './client'
 
 interface AsyncState<T> {
   data: T | null
@@ -32,7 +32,7 @@ export function useAsync<T>(load: () => Promise<T>, deps: unknown[] = []) {
       })
       .catch((error: unknown) => {
         if (!alive) return
-        const apiError = error instanceof ApiError ? error : new ApiError(0, { detail: '加载失败，请重试' }, null, null)
+        const apiError = error instanceof ApiError ? error : new ApiError(0, { detail: apiText('加载失败，请重试', 'Failed to load. Try again.') }, null, null)
         setState({ data: null, loading: false, error: apiError })
       })
     return () => {
