@@ -1,0 +1,693 @@
+openapi: 3.1.0
+x-module: routing
+x-status: design-v0.1
+info:
+  title: AI Gateway - Routing Model Alias API
+  version: 0.1.0
+  description: |
+    模型别名（对外模型名）→ 多上游目标（providers upstream model）的管理台契约。
+    语义见同目录 接口设计.md / 技术设计.md。
+
+    约定：
+    - 管理台：identity `gw_admin_session` Cookie + `X-CSRF-Token`。
+    - 目标只引用 providers 的 upstream model；账号/凭证/上游调用不归 routing。
+    - 客户端 `/v1/models` 由 S4 proxy/catalog 暴露，不在本契约；routing 只提供投影 service。
+    - 所有响应 `x-request-id` + `Cache-Control: no-store`。
+servers:
+  - url: http://127.0.0.1:8080
+    description: 本地开发
+tags:
+  - name: routing-admin
+    description: 管理台模型别名/目标
+paths:
+  /api/admin/model-aliases:
+    get:
+      tags: [routing-admin]
+      operationId: listModelAliases
+      summary: 模型别名列表（含目标概览）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/EnabledFilter'
+        - $ref: '#/components/parameters/QueryFilter'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: 别名分页列表
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelAliasPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    post:
+      tags: [routing-admin]
+      operationId: createModelAlias
+      summary: 创建模型别名 + 目标（至少 1 个启用目标）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateModelAliasRequest'
+            examples:
+              twoTargets:
+                value:
+                  alias: fast
+                  enabled: true
+                  targets:
+                    - upstream_model_id: 0f8a5dd0-7d6f-4b7e-9f8e-2d0f5b7a6c11
+                      priority: 1
+                      weight: 80
+                      enabled: true
+                    - upstream_model_id: 1b2c3d4e-5f60-4718-9a0b-1c2d3e4f5a6b
+                      priority: 2
+                      weight: 20
+                      enabled: true
+      responses:
+        '201':
+          description: 创建成功
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelAlias'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/model-aliases/{aliasId}:
+    parameters:
+      - $ref: '#/components/parameters/AliasId'
+    get:
+      tags: [routing-admin]
+      operationId: getModelAlias
+      summary: 别名详情
+      security:
+        - adminSession: []
+      responses:
+        '200':
+          description: 别名详情
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelAlias'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    patch:
+      tags: [routing-admin]
+      operationId: updateModelAlias
+      summary: 更新别名/启停/全量替换 targets
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateModelAliasRequest'
+      responses:
+        '200':
+          description: 更新后的别名
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelAlias'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    delete:
+      tags: [routing-admin]
+      operationId: deleteModelAlias
+      summary: 删除别名（幂等 204；Key 白名单旧名将失效）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: 已删除（不存在也 204）
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/model-aliases/{aliasId}/preview:
+    parameters:
+      - $ref: '#/components/parameters/AliasId'
+    get:
+      tags: [routing-admin]
+      operationId: previewModelAlias
+      summary: 确定性候选预览（不调用上游）
+      security:
+        - adminSession: []
+      responses:
+        '200':
+          description: 候选与告警
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelAliasPreview'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+components:
+  securitySchemes:
+    adminSession:
+      type: apiKey
+      in: cookie
+      name: gw_admin_session
+      description: identity 登录后下发的 HttpOnly Session Cookie
+  parameters:
+    AliasId:
+      name: aliasId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      description: identity 登录或 /me 返回的 CSRF token（43 字符）
+      schema:
+        type: string
+        minLength: 43
+        maxLength: 43
+    EnabledFilter:
+      name: enabled
+      in: query
+      required: false
+      schema:
+        type: boolean
+    QueryFilter:
+      name: q
+      in: query
+      required: false
+      description: alias 子串过滤（≤64）
+      schema:
+        type: string
+        maxLength: 64
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    Offset:
+      name: offset
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+  headers:
+    NoStore:
+      description: 路由配置不能被缓存
+      schema:
+        type: string
+        example: no-store
+    RequestId:
+      description: 请求 ID，与服务端日志关联
+      schema:
+        type: string
+        example: 0f8a5dd0-7d6f-4b7e-9f8e-2d0f5b7a6c11
+  responses:
+    BadRequest:
+      description: JSON/字段/目标校验失败
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ValidationProblem'
+          examples:
+            validation_failed:
+              value:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: validation_failed
+                detail: 请求参数不合法
+                errors:
+                  alias: 模型别名格式不正确
+            no_enabled_targets:
+              value:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: no_enabled_targets
+                detail: 至少需要一个启用的目标
+    NotAuthenticated:
+      description: 未登录/Session 过期
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            not_authenticated:
+              value:
+                type: about:blank
+                title: Unauthorized
+                status: 401
+                code: not_authenticated
+                detail: 请先登录
+    CsrfInvalid:
+      description: CSRF token 缺失或不正确
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            csrf_invalid:
+              value:
+                type: about:blank
+                title: Forbidden
+                status: 403
+                code: csrf_invalid
+                detail: CSRF token 不正确或已过期
+    NotFound:
+      description: 别名或目标上游模型不存在
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            model_alias_not_found:
+              value:
+                type: about:blank
+                title: Not Found
+                status: 404
+                code: model_alias_not_found
+                detail: 模型别名不存在
+            upstream_model_not_found:
+              value:
+                type: about:blank
+                title: Not Found
+                status: 404
+                code: upstream_model_not_found
+                detail: 上游模型不存在
+    Conflict:
+      description: 别名唯一冲突
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            model_alias_conflict:
+              value:
+                type: about:blank
+                title: Conflict
+                status: 409
+                code: model_alias_conflict
+                detail: 模型别名已存在
+    DatabaseUnavailable:
+      description: 数据库不可用
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            database_unavailable:
+              value:
+                type: about:blank
+                title: Service Unavailable
+                status: 503
+                code: database_unavailable
+                detail: 数据库暂不可用
+    InternalError:
+      description: 未预期错误
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            internal_error:
+              value:
+                type: about:blank
+                title: Internal Server Error
+                status: 500
+                code: internal_error
+                detail: 服务器内部错误，请稍后重试并提供 x-request-id
+  schemas:
+    TargetAdmin:
+      type: object
+      required:
+        - id
+        - upstream_model_id
+        - upstream_model
+        - canonical
+        - provider_id
+        - provider_name
+        - provider_kind
+        - provider_status
+        - priority
+        - weight
+        - enabled
+        - price_input
+        - price_output
+        - currency
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        upstream_model_id:
+          type: string
+          format: uuid
+        upstream_model:
+          type: string
+        canonical:
+          type: string
+        provider_id:
+          type: string
+          format: uuid
+        provider_name:
+          type: string
+        provider_kind:
+          type: string
+        provider_status:
+          type: string
+          enum: [active, disabled]
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        weight:
+          type: integer
+          minimum: 1
+          maximum: 100
+        enabled:
+          type: boolean
+        price_input:
+          type: [number, 'null']
+        price_output:
+          type: [number, 'null']
+        currency:
+          type: string
+          enum: [CNY, USD]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ModelAlias:
+      type: object
+      required: [id, alias, enabled, targets, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        alias:
+          type: string
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,63}$'
+        enabled:
+          type: boolean
+        targets:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/TargetAdmin'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ModelAliasPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModelAlias'
+        total:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+        offset:
+          type: integer
+    TargetInput:
+      type: object
+      additionalProperties: false
+      required: [upstream_model_id]
+      properties:
+        upstream_model_id:
+          type: string
+          format: uuid
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          default: 1
+        weight:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 100
+        enabled:
+          type: boolean
+          default: true
+    CreateModelAliasRequest:
+      type: object
+      additionalProperties: false
+      required: [alias, targets]
+      properties:
+        alias:
+          type: string
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,63}$'
+        enabled:
+          type: boolean
+          default: true
+        targets:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/TargetInput'
+    UpdateModelAliasRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        alias:
+          type: string
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,63}$'
+        enabled:
+          type: boolean
+        targets:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/TargetInput'
+    PreviewCandidate:
+      type: object
+      required:
+        - upstream_model_id
+        - upstream_model
+        - provider_id
+        - provider_name
+        - provider_status
+        - active_account_count
+        - priority
+        - weight
+        - enabled
+        - warnings
+      properties:
+        upstream_model_id:
+          type: string
+          format: uuid
+        upstream_model:
+          type: string
+        provider_id:
+          type: string
+          format: uuid
+        provider_name:
+          type: string
+        provider_status:
+          type: string
+          enum: [active, disabled]
+        active_account_count:
+          type: integer
+          minimum: 0
+        priority:
+          type: integer
+        weight:
+          type: integer
+        enabled:
+          type: boolean
+        warnings:
+          type: array
+          items:
+            type: string
+    ModelAliasPreview:
+      type: object
+      required: [alias, enabled, candidates, warnings]
+      properties:
+        alias:
+          type: string
+        enabled:
+          type: boolean
+        candidates:
+          type: array
+          items:
+            $ref: '#/components/schemas/PreviewCandidate'
+        warnings:
+          type: array
+          items:
+            type: string
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          default: about:blank
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          type: string
+        detail:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: string
+          description: 仅 400 validation_failed
+    ValidationProblem:
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          required: [errors]
+          properties:
+            errors:
+              type: object
+              additionalProperties:
+                type: string

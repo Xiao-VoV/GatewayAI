@@ -1,0 +1,230 @@
+openapi: 3.1.0
+x-module: settings
+x-status: implemented-v0.1
+info:
+  title: AI Gateway - Settings API
+  version: 0.1.0
+  description: |
+    平台设置（US-024）：默认供应商、请求日志/审计保留天数、上游超时。
+    DB `app_settings` 单例为权威；PATCH 后 runtime 立即生效（保留下一清理 tick、超时下一请求）。
+    管理台 Session + CSRF；全部响应 `x-request-id` + `Cache-Control: no-store`。
+servers:
+  - url: http://127.0.0.1:8080
+    description: 本地开发
+tags:
+  - name: settings-admin
+    description: 平台设置
+paths:
+  /api/admin/settings:
+    get:
+      tags: [settings-admin]
+      operationId: getSettings
+      summary: 读取平台设置
+      security:
+        - adminSession: []
+      responses:
+        '200':
+          description: 当前设置
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    patch:
+      tags: [settings-admin]
+      operationId: updateSettings
+      summary: 更新平台设置（至少一字段）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchSettingsRequest'
+      responses:
+        '200':
+          description: 更新后的设置
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+components:
+  securitySchemes:
+    adminSession:
+      type: apiKey
+      in: cookie
+      name: gw_admin_session
+  parameters:
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema:
+        type: string
+  headers:
+    RequestId:
+      schema:
+        type: string
+    NoStore:
+      schema:
+        type: string
+        const: no-store
+  responses:
+    BadRequest:
+      description: 校验失败
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotAuthenticated:
+      description: 未登录
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    CsrfInvalid:
+      description: CSRF 无效
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotFound:
+      description: 资源不存在（默认供应商）
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    InternalError:
+      description: 内部错误
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    DatabaseUnavailable:
+      description: 数据库不可用
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    Settings:
+      type: object
+      required:
+        - default_provider_id
+        - request_log_retention_days
+        - audit_retention_days
+        - upstream_timeout_secs
+        - updated_at
+      properties:
+        default_provider_id:
+          type: [string, 'null']
+          format: uuid
+        request_log_retention_days:
+          type: integer
+          minimum: 1
+          maximum: 365
+        audit_retention_days:
+          type: integer
+          minimum: 180
+          maximum: 3650
+        upstream_timeout_secs:
+          type: integer
+          minimum: 5
+          maximum: 600
+        updated_at:
+          type: string
+          format: date-time
+    PatchSettingsRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        default_provider_id:
+          type: [string, 'null']
+          format: uuid
+        request_log_retention_days:
+          type: integer
+          minimum: 1
+          maximum: 365
+        audit_retention_days:
+          type: integer
+          minimum: 180
+          maximum: 3650
+        upstream_timeout_secs:
+          type: integer
+          minimum: 5
+          maximum: 600
+    Problem:
+      type: object
+      required: [type, title, status, code]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        code:
+          type: string
+        detail:
+          type: string

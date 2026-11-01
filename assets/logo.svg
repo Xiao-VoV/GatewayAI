@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="GatewayAI logo">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="1" stop-color="#101a2e"/>
+    </linearGradient>
+    <linearGradient id="flow" gradientUnits="userSpaceOnUse" x1="54" y1="128" x2="150" y2="128">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#6366f1"/>
+    </linearGradient>
+    <linearGradient id="out" gradientUnits="userSpaceOnUse" x1="166" y1="128" x2="198" y2="128">
+      <stop offset="0" stop-color="#a5b4fc"/>
+      <stop offset="1" stop-color="#f8fafc"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="url(#bg)"/>
+  <rect x="1.5" y="1.5" width="253" height="253" rx="54.5" fill="none" stroke="#1e293b" stroke-width="3"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M54 74 H102 Q118 74 125 87 L146 128" stroke="url(#flow)" stroke-width="13"/>
+    <path d="M54 128 H146" stroke="url(#flow)" stroke-width="13"/>
+    <path d="M54 182 H102 Q118 182 125 169 L146 128" stroke="url(#flow)" stroke-width="13"/>
+    <circle cx="150" cy="128" r="13" fill="#0b1220" stroke="#22d3ee" stroke-width="7"/>
+    <path d="M166 128 H186" stroke="url(#out)" stroke-width="13"/>
+    <path d="M176 111 L198 128 L176 145" stroke="url(#out)" stroke-width="13"/>
+  </g>
+</svg>

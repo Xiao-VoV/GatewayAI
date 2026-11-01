@@ -1,0 +1,706 @@
+openapi: 3.1.0
+x-module: metering
+x-status: design-v0.1
+info:
+  title: AI Gateway - Metering Overview & Usage API
+  version: 0.1.0
+  description: |
+    计量/用量模块的管理台只读契约：总览与按维度聚合。
+    语义见同目录 接口设计.md / 技术设计.md；数据库见 数据库设计.md。
+
+    约定：
+    - 管理台：identity `gw_admin_session` Cookie（只读，无 CSRF）。
+    - 金额/成本一律十进制字符串（固定 6 位小数）；日/时区为 Asia/Shanghai；时间入参 RFC 3339。
+    - 所有响应 `x-request-id` + `Cache-Control: no-store`；错误 application/problem+json。
+    - 401/无身份请求不进入计量台账（只在 observability request_logs）；本模块统计“已鉴权请求”。
+    - 客户端只读端点 `/api/client/usage` 使用设备 token + 虚拟 Key；只返回本人聚合，`user_id` 由鉴权上下文决定。
+    - `record_usage`/`today_spend` 为进程内 service，不在 HTTP 契约。
+servers:
+  - url: http://127.0.0.1:8080
+    description: 本地开发
+tags:
+  - name: metering-admin
+    description: 管理台计量总览与用量聚合（只读）
+  - name: metering-client
+    description: 客户端本人用量（设备 token + 虚拟 Key）
+paths:
+  /api/admin/overview:
+    get:
+      tags: [metering-admin]
+      operationId: getOverview
+      summary: 今日请求/花费/错误率 + N 天趋势
+      description: |
+        今日数据实时聚合 usage_records；已完成日读 daily_usage_rollups（未结账日回退明细）。
+        无数据返回 200 与全 0（前端空态），不返回 404。
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/Days'
+      responses:
+        '200':
+          description: 总览
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Overview'
+              examples:
+                withData:
+                  value:
+                    currency: CNY
+                    timezone: Asia/Shanghai
+                    generated_at: '2026-10-30T10:00:00Z'
+                    days: 2
+                    today:
+                      day: '2026-10-30'
+                      requests: 123
+                      success_requests: 118
+                      error_requests: 3
+                      rejected_requests: 1
+                      client_disconnect_requests: 1
+                      input_tokens: 120000
+                      output_tokens: 45000
+                      cost: '1.234500'
+                      error_rate: 0.02439
+                      status_breakdown:
+                        success: 118
+                        upstream_error: 2
+                        timeout: 1
+                        gateway_error: 0
+                        client_disconnect: 1
+                        rejected: 1
+                    trend:
+                      - day: '2026-10-29'
+                        requests: 90
+                        success_requests: 88
+                        error_requests: 2
+                        rejected_requests: 0
+                        client_disconnect_requests: 0
+                        input_tokens: 90000
+                        output_tokens: 30000
+                        cost: '0.900000'
+                        error_rate: 0.022222
+                      - day: '2026-10-30'
+                        requests: 123
+                        success_requests: 118
+                        error_requests: 3
+                        rejected_requests: 1
+                        client_disconnect_requests: 1
+                        input_tokens: 120000
+                        output_tokens: 45000
+                        cost: '1.234500'
+                        error_rate: 0.02439
+                    totals:
+                      requests: 700
+                      success_requests: 680
+                      error_requests: 15
+                      rejected_requests: 3
+                      client_disconnect_requests: 2
+                      input_tokens: 700000
+                      output_tokens: 240000
+                      cost: '7.000000'
+                empty:
+                  value:
+                    currency: CNY
+                    timezone: Asia/Shanghai
+                    generated_at: '2026-10-30T10:00:00Z'
+                    days: 7
+                    today:
+                      day: '2026-10-30'
+                      requests: 0
+                      success_requests: 0
+                      error_requests: 0
+                      rejected_requests: 0
+                      client_disconnect_requests: 0
+                      input_tokens: 0
+                      output_tokens: 0
+                      cost: '0.000000'
+                      error_rate: 0
+                      status_breakdown:
+                        success: 0
+                        upstream_error: 0
+                        timeout: 0
+                        gateway_error: 0
+                        client_disconnect: 0
+                        rejected: 0
+                    trend: []
+                    totals:
+                      requests: 0
+                      success_requests: 0
+                      error_requests: 0
+                      rejected_requests: 0
+                      client_disconnect_requests: 0
+                      input_tokens: 0
+                      output_tokens: 0
+                      cost: '0.000000'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/client/usage:
+    get:
+      tags: [metering-client]
+      operationId: getClientUsage
+      summary: 客户端本人今日/趋势/合计用量
+      description: |
+        设备 token + 虚拟 Key 鉴权；user_id 来自认证上下文，客户端不可传。
+        响应形状与 /api/admin/overview 一致，只返回本人聚合。
+      security:
+        - clientApiKey: []
+          clientDeviceToken: []
+      parameters:
+        - $ref: '#/components/parameters/Days'
+      responses:
+        '200':
+          description: 本人用量
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Overview'
+        '400':
+          description: days 非法
+        '401':
+          description: Key/device token 缺失或无效
+        '403':
+          description: 设备/用户/Key 被禁用
+        '500':
+          description: 未预期错误
+        '503':
+          description: 数据库不可用
+  /api/admin/usage:
+    get:
+      tags: [metering-admin]
+      operationId: getUsage
+      summary: 按 day/model_alias/key_id 聚合用量（tokens/请求数/成本）
+      description: |
+        时间范围 [from,to)：今日明细 + 已完成日 rollup 精确合并；`total` 为分组数量，
+        `totals` 为整个过滤区间合计（不受分页影响）。无数据返回 200 空 items。
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/GroupBy'
+        - $ref: '#/components/parameters/UserIdFilter'
+        - $ref: '#/components/parameters/KeyIdFilter'
+        - $ref: '#/components/parameters/ModelAliasFilter'
+        - $ref: '#/components/parameters/ProviderIdFilter'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: 用量聚合分页
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsagePage'
+              examples:
+                byDayAndModel:
+                  value:
+                    currency: CNY
+                    from: '2026-10-24T00:00:00Z'
+                    to: '2026-10-30T10:00:00Z'
+                    group_by: [day, model_alias]
+                    totals:
+                      requests: 700
+                      success_requests: 680
+                      error_requests: 15
+                      rejected_requests: 3
+                      client_disconnect_requests: 2
+                      input_tokens: 700000
+                      output_tokens: 240000
+                      cost: '7.000000'
+                    items:
+                      - day: '2026-10-24'
+                        model_alias: fast
+                        requests: 90
+                        success_requests: 88
+                        error_requests: 2
+                        rejected_requests: 0
+                        client_disconnect_requests: 0
+                        input_tokens: 90000
+                        output_tokens: 30000
+                        cost: '0.900000'
+                    total: 12
+                    limit: 50
+                    offset: 0
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+components:
+  securitySchemes:
+    adminSession:
+      type: apiKey
+      in: cookie
+      name: gw_admin_session
+      description: identity 登录后下发的 HttpOnly Session Cookie
+    clientApiKey:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: 'Bearer <virtual_key>；也接受 x-api-key/x-goog-api-key'
+    clientDeviceToken:
+      type: apiKey
+      in: header
+      name: X-GW-Device-Token
+      description: access 签发的短期设备 token（15min）
+  parameters:
+    Days:
+      name: days
+      in: query
+      required: false
+      description: 趋势窗口天数（含今天），1–30
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 30
+        default: 7
+    From:
+      name: from
+      in: query
+      required: false
+      description: 起始时间（含），RFC 3339；默认今天-6 天 00:00（Asia/Shanghai）
+      schema:
+        type: string
+        format: date-time
+    To:
+      name: to
+      in: query
+      required: false
+      description: 结束时间（不含），RFC 3339；默认当前时间；跨度 ≤366 天
+      schema:
+        type: string
+        format: date-time
+    GroupBy:
+      name: group_by
+      in: query
+      required: false
+      description: 逗号分隔分组维度，元素 ∈ day,model_alias,key_id；默认 day
+      schema:
+        type: string
+        maxLength: 64
+        default: day
+        examples: [day, 'day,model_alias', 'day,model_alias,key_id']
+    UserIdFilter:
+      name: user_id
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+    KeyIdFilter:
+      name: key_id
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+    ModelAliasFilter:
+      name: model_alias
+      in: query
+      required: false
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 100
+    ProviderIdFilter:
+      name: provider_id
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    Offset:
+      name: offset
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        maximum: 100000
+        default: 0
+  headers:
+    NoStore:
+      description: 计量数据不能被缓存
+      schema:
+        type: string
+        example: no-store
+    RequestId:
+      description: 请求 ID，与服务端日志关联
+      schema:
+        type: string
+        example: 0f8a5dd0-7d6f-4b7e-9f8e-2d0f5b7a6c11
+  responses:
+    BadRequest:
+      description: 查询参数/时间范围/分组维度/分页非法
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            validation_failed:
+              value:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: validation_failed
+                detail: 请求参数不合法
+                errors:
+                  limit: limit 必须在 1–200 之间
+            invalid_time_range:
+              value:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: invalid_time_range
+                detail: from 必须早于 to，且跨度不超过 366 天
+            invalid_group_by:
+              value:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: invalid_group_by
+                detail: group_by 只支持 day,model_alias,key_id
+    NotAuthenticated:
+      description: 未登录/Session 过期
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            not_authenticated:
+              value:
+                type: about:blank
+                title: Unauthorized
+                status: 401
+                code: not_authenticated
+                detail: 请先登录
+    DatabaseUnavailable:
+      description: 数据库不可用
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            database_unavailable:
+              value:
+                type: about:blank
+                title: Service Unavailable
+                status: 503
+                code: database_unavailable
+                detail: 数据库暂不可用
+    InternalError:
+      description: 未预期错误（详情只进日志）
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            internal_error:
+              value:
+                type: about:blank
+                title: Internal Server Error
+                status: 500
+                code: internal_error
+                detail: 服务器内部错误，请稍后重试并提供 x-request-id
+  schemas:
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          default: about:blank
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          type: string
+        detail:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: string
+          description: 仅 400 validation_failed
+    Metrics:
+      type: object
+      required:
+        - requests
+        - success_requests
+        - error_requests
+        - rejected_requests
+        - client_disconnect_requests
+        - input_tokens
+        - output_tokens
+        - cost
+      properties:
+        requests:
+          type: integer
+          format: int64
+          minimum: 0
+          description: = success + error + rejected + client_disconnect
+        success_requests:
+          type: integer
+          format: int64
+          minimum: 0
+        error_requests:
+          type: integer
+          format: int64
+          minimum: 0
+          description: upstream_error + timeout + gateway_error（进入 error_rate）
+        rejected_requests:
+          type: integer
+          format: int64
+          minimum: 0
+          description: 已鉴权后被网关拒绝（429/403/404/413/400），不计入 error_rate
+        client_disconnect_requests:
+          type: integer
+          format: int64
+          minimum: 0
+        input_tokens:
+          type: integer
+          format: int64
+          minimum: 0
+        output_tokens:
+          type: integer
+          format: int64
+          minimum: 0
+        cost:
+          type: string
+          pattern: '^(0|[1-9][0-9]*)\.[0-9]{6}$'
+          description: CNY 成本，固定 6 位小数字符串
+          examples: ['0.000000', '1.234500']
+    StatusBreakdown:
+      type: object
+      description: 今日按状态细分（六值固定键）
+      required: [success, upstream_error, timeout, gateway_error, client_disconnect, rejected]
+      properties:
+        success:
+          type: integer
+          format: int64
+          minimum: 0
+        upstream_error:
+          type: integer
+          format: int64
+          minimum: 0
+        timeout:
+          type: integer
+          format: int64
+          minimum: 0
+        gateway_error:
+          type: integer
+          format: int64
+          minimum: 0
+        client_disconnect:
+          type: integer
+          format: int64
+          minimum: 0
+        rejected:
+          type: integer
+          format: int64
+          minimum: 0
+    OverviewToday:
+      allOf:
+        - $ref: '#/components/schemas/Metrics'
+        - type: object
+          required: [day, error_rate, status_breakdown]
+          properties:
+            day:
+              type: string
+              format: date
+              description: Asia/Shanghai 日期
+            error_rate:
+              type: number
+              minimum: 0
+              maximum: 1
+              description: error_requests / requests（requests=0 时为 0）
+            status_breakdown:
+              $ref: '#/components/schemas/StatusBreakdown'
+    OverviewTrendDay:
+      allOf:
+        - $ref: '#/components/schemas/Metrics'
+        - type: object
+          required: [day, error_rate]
+          properties:
+            day:
+              type: string
+              format: date
+            error_rate:
+              type: number
+              minimum: 0
+              maximum: 1
+    Overview:
+      type: object
+      required: [currency, timezone, generated_at, days, today, trend, totals]
+      properties:
+        currency:
+          type: string
+          enum: [CNY]
+        timezone:
+          type: string
+          enum: [Asia/Shanghai]
+        generated_at:
+          type: string
+          format: date-time
+        days:
+          type: integer
+          minimum: 1
+          maximum: 30
+        today:
+          $ref: '#/components/schemas/OverviewToday'
+        trend:
+          type: array
+          description: 长度 = days，按 day 升序，最后一项为今天
+          items:
+            $ref: '#/components/schemas/OverviewTrendDay'
+        totals:
+          $ref: '#/components/schemas/Metrics'
+    UsageRow:
+      type: object
+      required:
+        - requests
+        - success_requests
+        - error_requests
+        - rejected_requests
+        - client_disconnect_requests
+        - input_tokens
+        - output_tokens
+        - cost
+      properties:
+        day:
+          type: string
+          format: date
+          description: 仅 group_by 含 day 时出现
+        model_alias:
+          type: string
+          maxLength: 100
+          description: 仅 group_by 含 model_alias 时出现
+        key_id:
+          type: string
+          format: uuid
+          description: 仅 group_by 含 key_id 时出现
+        requests:
+          type: integer
+          format: int64
+          minimum: 0
+        success_requests:
+          type: integer
+          format: int64
+          minimum: 0
+        error_requests:
+          type: integer
+          format: int64
+          minimum: 0
+        rejected_requests:
+          type: integer
+          format: int64
+          minimum: 0
+        client_disconnect_requests:
+          type: integer
+          format: int64
+          minimum: 0
+        input_tokens:
+          type: integer
+          format: int64
+          minimum: 0
+        output_tokens:
+          type: integer
+          format: int64
+          minimum: 0
+        cost:
+          type: string
+          pattern: '^(0|[1-9][0-9]*)\.[0-9]{6}$'
+    UsagePage:
+      type: object
+      required: [currency, from, to, group_by, totals, items, total, limit, offset]
+      properties:
+        currency:
+          type: string
+          enum: [CNY]
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        group_by:
+          type: array
+          minItems: 1
+          maxItems: 3
+          uniqueItems: true
+          items:
+            type: string
+            enum: [day, model_alias, key_id]
+        totals:
+          $ref: '#/components/schemas/Metrics'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/UsageRow'
+        total:
+          type: integer
+          minimum: 0
+          description: 分组总数（不受分页影响）
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 200
+        offset:
+          type: integer
+          minimum: 0

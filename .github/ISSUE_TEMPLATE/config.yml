@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全问题
+    url: https://github.com/Xiao-VoV/GatewayAI/security/advisories/new
+    about: 请勿在公开 issue 中披露安全漏洞，按 SECURITY.md 私下报告
+  - name: 使用与讨论
+    url: https://github.com/Xiao-VoV/GatewayAI/discussions
+    about: 使用问题、方案讨论与经验分享

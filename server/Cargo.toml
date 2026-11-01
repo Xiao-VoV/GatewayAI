@@ -1,0 +1,47 @@
+[package]
+name = "gw-server"
+version = "0.1.0"
+edition = "2024"
+# 应用 crate，禁止误发布到 crates.io；项目整体以 AGPL-3.0 开源。
+license = "AGPL-3.0-only"
+repository = "https://github.com/Xiao-VoV/GatewayAI"
+publish = false
+
+[dependencies]
+aes-gcm = "0.10"
+anyhow = "1"
+argon2 = "0.5"
+axum = "0.8"
+base64 = "0.22"
+bytes = "1"
+chrono = { version = "0.4", features = ["serde"] }
+dotenvy = "0.15"
+futures-util = "0.3"
+hex = "0.4"
+rand = "0.8"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }
+rust_decimal = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+sha2 = "0.10"
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio",
+    "postgres",
+    "migrate",
+    "macros",
+    "uuid",
+    "chrono",
+    "json",
+] }
+subtle = "2"
+thiserror = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "net", "time"] }
+tower-http = { version = "0.6", features = ["trace", "request-id"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+
+[dev-dependencies]
+http-body-util = "0.1"
+serde_yaml = "0.9"
+tower = { version = "0.5", features = ["util"] }

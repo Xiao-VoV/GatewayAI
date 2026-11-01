@@ -1,0 +1,24 @@
+{
+  "name": "gatewayai",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Open-source enterprise AI gateway: one OpenAI-compatible endpoint for every model.",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Xiao-VoV/GatewayAI.git"
+  },
+  "packageManager": "pnpm@11.28.5",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev:admin": "pnpm --filter @gw/admin dev",
+    "dev:client": "pnpm --filter @gw/client dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "server:dev": "cargo run --manifest-path server/Cargo.toml",
+    "check:admin": "pnpm --filter @gw/admin typecheck && pnpm --filter @gw/admin build",
+    "check:client": "pnpm --filter @gw/client typecheck && pnpm --filter @gw/client build"
+  }
+}

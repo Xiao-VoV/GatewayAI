@@ -1,0 +1,2984 @@
+openapi: 3.1.0
+x-module: catalog
+x-status: implemented-v0.1
+info:
+  title: AI Gateway - Catalog (Model Group / Deployment / Publication) API
+  version: 0.1.0
+  description: |
+    模型目录（catalog）机器契约：上游模型 → 部署 → 模型组 → 发布 → 客户端已发布目录。
+
+    约定：
+    - 管理台 `/api/admin/*`：identity `gw_admin_session` Cookie + `X-CSRF-Token`（写）。
+    - 客户端 `/v1/models*`：数据面鉴权 = 虚拟 Key（`Authorization: Bearer`）+ 设备令牌
+      （`X-GW-Device-Token`），HTTP owner = catalog（proxy 不注册该路由）。
+    - 客户端响应只含已发布且可见的模型，**不含 canonical/价格/供应商/账号/allowed**。
+    - 所有响应 `x-request-id` + `Cache-Control: no-store`；客户端目录额外 `x-gw-catalog-version`。
+    - 语义权威：同目录 `接口设计.md` / `技术设计.md` / `数据库设计.md`。
+    - S4 过渡：`GET /v1/models` 由 catalog handler 委托 routing 投影（版本 `routing:<n>`）；
+      `GET /v1/models/{id}` 在 S4 返回 501，v0.1.x 起生效。
+servers:
+  - url: http://127.0.0.1:8080
+    description: 本地开发
+tags:
+  - name: catalog-admin
+    description: 管理台：模型组/部署/聚合建议/发布/工具默认/员工目录预览
+  - name: catalog-client
+    description: 客户端数据面：已发布模型目录
+paths:
+  /api/admin/model-groups:
+    get:
+      tags: [catalog-admin]
+      operationId: listModelGroups
+      summary: 模型组分页列表
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/ModelGroupStatusFilter'
+        - $ref: '#/components/parameters/CanonicalFilter'
+        - $ref: '#/components/parameters/QueryFilter'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: 模型组分页
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelGroupPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    post:
+      tags: [catalog-admin]
+      operationId: createModelGroup
+      summary: 创建模型组（可选携带初始部署）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelGroupCreateRequest'
+            examples:
+              minimal:
+                value:
+                  client_model_name: deepseek-chat
+                  canonical: deepseek-chat
+              with_deployment:
+                value:
+                  client_model_name: claude-sonnet-4-5
+                  display_name: Claude Sonnet 4.5
+                  canonical: claude-sonnet-4-5
+                  capabilities: [chat, stream, tools]
+                  context_window: 200000
+                  max_output: 8192
+                  protocols: [openai_chat, anthropic_messages]
+                  status: active
+                  deployments:
+                    - upstream_model_id: 33333333-3333-3333-3333-333333333333
+                      provider_account_id: 22222222-2222-2222-2222-222222222222
+                      priority: 1
+                      weight: 100
+                      enabled: true
+      responses:
+        '201':
+          description: 创建成功
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelGroupAdmin'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '409':
+          $ref: '#/components/responses/ConflictProblem'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/model-groups/{modelGroupId}:
+    parameters:
+      - $ref: '#/components/parameters/ModelGroupId'
+    get:
+      tags: [catalog-admin]
+      operationId: getModelGroup
+      summary: 模型组详情（含部署/发布/告警）
+      security:
+        - adminSession: []
+      responses:
+        '200':
+          description: 模型组详情
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelGroupAdmin'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    patch:
+      tags: [catalog-admin]
+      operationId: updateModelGroup
+      summary: 更新模型组字段/状态（激活需至少一个启用部署）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelGroupUpdateRequest'
+            examples:
+              activate:
+                value:
+                  status: active
+              update_capabilities:
+                value:
+                  capabilities: [chat, stream, tools, vision]
+                  context_window: 200000
+      responses:
+        '200':
+          description: 更新后的模型组
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelGroupAdmin'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '409':
+          $ref: '#/components/responses/ConflictProblem'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    delete:
+      tags: [catalog-admin]
+      operationId: deleteModelGroup
+      summary: 归档模型组（软删除，幂等 204；恢复用 PATCH status）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: 已归档（不存在也 204）
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/model-groups/{modelGroupId}/route-preview:
+    parameters:
+      - $ref: '#/components/parameters/ModelGroupId'
+    get:
+      tags: [catalog-admin]
+      operationId: previewModelGroupRoutes
+      summary: 路由候选确定性预览（不调用上游、不消耗随机性）
+      security:
+        - adminSession: []
+      responses:
+        '200':
+          description: 候选与告警
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelGroupRoutePreview'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/deployments:
+    get:
+      tags: [catalog-admin]
+      operationId: listDeployments
+      summary: 部署分页列表（含 providers 实时状态富化）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/ModelGroupIdQuery'
+        - $ref: '#/components/parameters/UpstreamModelIdQuery'
+        - $ref: '#/components/parameters/ProviderIdQuery'
+        - $ref: '#/components/parameters/ProviderAccountIdQuery'
+        - $ref: '#/components/parameters/EnabledFilter'
+        - $ref: '#/components/parameters/UngroupedFilter'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: 部署分页
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    post:
+      tags: [catalog-admin]
+      operationId: createDeployment
+      summary: 创建部署（上游模型 × 渠道账号；可入组或暂不归属）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeploymentCreateRequest'
+            examples:
+              ungrouped:
+                value:
+                  upstream_model_id: 33333333-3333-3333-3333-333333333334
+                  provider_account_id: 22222222-2222-2222-2222-222222222223
+              grouped:
+                value:
+                  upstream_model_id: 33333333-3333-3333-3333-333333333333
+                  provider_account_id: 22222222-2222-2222-2222-222222222222
+                  model_group_id: 44444444-4444-4444-4444-444444444444
+                  priority: 1
+                  weight: 100
+                  enabled: true
+      responses:
+        '201':
+          description: 创建成功
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentAdmin'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '409':
+          $ref: '#/components/responses/ConflictProblem'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/deployments/{deploymentId}:
+    parameters:
+      - $ref: '#/components/parameters/DeploymentId'
+    get:
+      tags: [catalog-admin]
+      operationId: getDeployment
+      summary: 部署详情
+      security:
+        - adminSession: []
+      responses:
+        '200':
+          description: 部署详情
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentAdmin'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    patch:
+      tags: [catalog-admin]
+      operationId: updateDeployment
+      summary: 更新部署（权重/优先级/启停/入组或移出组）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeploymentUpdateRequest'
+            examples:
+              disable:
+                value:
+                  enabled: false
+              attach:
+                value:
+                  model_group_id: 44444444-4444-4444-4444-444444444444
+              detach:
+                value:
+                  model_group_id: null
+      responses:
+        '200':
+          description: 更新后的部署
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentAdmin'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '409':
+          $ref: '#/components/responses/ConflictProblem'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    delete:
+      tags: [catalog-admin]
+      operationId: deleteDeployment
+      summary: 删除部署（物理删除，204 幂等；建议先停用）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: 已删除（不存在也 204）
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/model-group-suggestions:
+    get:
+      tags: [catalog-admin]
+      operationId: listMergeSuggestions
+      summary: 聚合建议列表（实时计算；已拒绝指纹被抑制）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CanonicalFilter'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: 建议分页（按 first_seen_at 升序，最多 200 条）
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MergeSuggestionPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/model-group-suggestions/{suggestionKey}/confirm:
+    parameters:
+      - $ref: '#/components/parameters/SuggestionKey'
+    post:
+      tags: [catalog-admin]
+      operationId: confirmMergeSuggestion
+      summary: 确认聚合建议（新建模型组或并入既有组，幂等）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmMergeSuggestionRequest'
+            examples:
+              create_group:
+                value:
+                  action: create_group
+                  client_model_name: claude-sonnet-4-5
+                  display_name: Claude Sonnet 4.5
+              merge_into_group:
+                value:
+                  action: merge_into_group
+                  target_group_id: 44444444-4444-4444-4444-444444444444
+      responses:
+        '200':
+          description: 合并结果（重复确认返回既有结果）
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MergeConfirmation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '409':
+          $ref: '#/components/responses/ConflictProblem'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/model-group-suggestions/{suggestionKey}/reject:
+    parameters:
+      - $ref: '#/components/parameters/SuggestionKey'
+    post:
+      tags: [catalog-admin]
+      operationId: rejectMergeSuggestion
+      summary: 拒绝聚合建议（保持独立，留决策审计，幂等）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectMergeSuggestionRequest'
+            examples:
+              variant_mismatch:
+                value:
+                  note: 版本不同，保持独立
+      responses:
+        '200':
+          description: 拒绝结果（重复拒绝幂等返回）
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MergeRejection'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '409':
+          $ref: '#/components/responses/ConflictProblem'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/publications:
+    get:
+      tags: [catalog-admin]
+      operationId: listPublications
+      summary: 发布分页列表
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/ModelGroupIdQuery'
+        - $ref: '#/components/parameters/PublicationStatusFilter'
+        - $ref: '#/components/parameters/SubjectTypeFilter'
+        - $ref: '#/components/parameters/SubjectIdFilter'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: 发布分页
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicationPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    post:
+      tags: [catalog-admin]
+      operationId: createPublication
+      summary: 创建发布（一模型组一条；含发布对象/配额/数据等级配置面）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicationCreateRequest'
+            examples:
+              all_users:
+                value:
+                  model_group_id: 44444444-4444-4444-4444-444444444444
+                  targets:
+                    - subject_type: all_users
+                      visible: true
+                      allowed: true
+              mixed_targets:
+                value:
+                  model_group_id: 44444444-4444-4444-4444-444444444444
+                  data_level_max: 2
+                  quota_rpm: 60
+                  quota_tpm: 200000
+                  quota_daily_requests: 5000
+                  note: 研发部主模型
+                  targets:
+                    - subject_type: user
+                      subject_id: 99999999-9999-9999-9999-999999999999
+                      visible: true
+                      allowed: true
+      responses:
+        '201':
+          description: 创建成功
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicationAdmin'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '409':
+          $ref: '#/components/responses/ConflictProblem'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/publications/{publicationId}:
+    parameters:
+      - $ref: '#/components/parameters/PublicationId'
+    get:
+      tags: [catalog-admin]
+      operationId: getPublication
+      summary: 发布详情（含对象清单与 enforcement 标注）
+      security:
+        - adminSession: []
+      responses:
+        '200':
+          description: 发布详情
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicationAdmin'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    patch:
+      tags: [catalog-admin]
+      operationId: updatePublication
+      summary: 更新发布/暂停恢复/全量替换发布对象
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicationUpdateRequest'
+            examples:
+              pause:
+                value:
+                  status: paused
+              replace_targets:
+                value:
+                  targets:
+                    - subject_type: all_users
+                      visible: true
+                      allowed: false
+      responses:
+        '200':
+          description: 更新后的发布
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicationAdmin'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '409':
+          $ref: '#/components/responses/ConflictProblem'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    delete:
+      tags: [catalog-admin]
+      operationId: deletePublication
+      summary: 删除发布（回收，204 幂等；模型组回到未发布）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: 已删除（不存在也 204）
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/tool-model-defaults:
+    get:
+      tags: [catalog-admin]
+      operationId: listToolModelDefaults
+      summary: 工具默认模型分页列表
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/ToolKeyFilter'
+        - $ref: '#/components/parameters/ScopeTypeFilter'
+        - $ref: '#/components/parameters/ScopeIdFilter'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: 工具默认分页
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolModelDefaultPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    post:
+      tags: [catalog-admin]
+      operationId: createToolModelDefault
+      summary: 创建工具默认模型（global/user；user_group 预留）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ToolModelDefaultCreateRequest'
+            examples:
+              global_claude_code:
+                value:
+                  tool_key: claude_code
+                  scope_type: global
+                  scope_id: null
+                  default_model_group_id: 44444444-4444-4444-4444-444444444444
+                  allow_switch: true
+                  allowed_model_group_ids:
+                    - 55555555-5555-5555-5555-555555555555
+      responses:
+        '201':
+          description: 创建成功
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolModelDefaultAdmin'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '409':
+          $ref: '#/components/responses/ConflictProblem'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/tool-model-defaults/{toolDefaultId}:
+    parameters:
+      - $ref: '#/components/parameters/ToolDefaultId'
+    patch:
+      tags: [catalog-admin]
+      operationId: updateToolModelDefault
+      summary: 更新工具默认/切换开关/全量替换白名单
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ToolModelDefaultUpdateRequest'
+            examples:
+              disable_switch:
+                value:
+                  allow_switch: false
+              replace_whitelist:
+                value:
+                  allow_switch: true
+                  allowed_model_group_ids:
+                    - 55555555-5555-5555-5555-555555555555
+      responses:
+        '200':
+          description: 更新后的工具默认
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolModelDefaultAdmin'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    delete:
+      tags: [catalog-admin]
+      operationId: deleteToolModelDefault
+      summary: 删除工具默认模型（204 幂等）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: 已删除（不存在也 204）
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/catalog/preview:
+    get:
+      tags: [catalog-admin]
+      operationId: previewAdminCatalog
+      summary: 员工作业目录预览（按用户/设备/Key 投影，含诊断；不含价格/供应商）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/UserIdQuery'
+        - $ref: '#/components/parameters/DeviceIdQuery'
+        - $ref: '#/components/parameters/KeyIdQuery'
+      responses:
+        '200':
+          description: 投影结果与诊断
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminCatalogPreview'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /v1/models:
+    get:
+      tags: [catalog-client]
+      operationId: listClientModels
+      summary: 客户端已发布模型目录（只投影 visible）
+      description: |
+        S4 过渡期：catalog handler 委托 routing 投影，`catalog_version = routing:<n>`；
+        v0.1.x：发布投影，`catalog_version = cat:<n>`。报文形状两阶段一致（v0.1.x 只增字段）。
+      security:
+        - virtualKey: []
+          deviceToken: []
+      responses:
+        '200':
+          description: 可见模型列表
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+            X-GW-Catalog-Version:
+              $ref: '#/components/headers/CatalogVersion'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientCatalogList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '403':
+          $ref: '#/components/responses/ClientForbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /v1/models/{modelId}:
+    parameters:
+      - $ref: '#/components/parameters/ClientModelId'
+    get:
+      tags: [catalog-client]
+      operationId: getClientModel
+      summary: 客户端模型详情（参数/协议兼容标注；S4 过渡期 501）
+      description: |
+        v0.1.x 起生效：id 为客户端模型名；不可见/不存在统一 404 model_not_found（不泄露草稿/归档）。
+      security:
+        - virtualKey: []
+          deviceToken: []
+      responses:
+        '200':
+          description: 模型详情
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+            X-GW-Catalog-Version:
+              $ref: '#/components/headers/CatalogVersion'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientModelDetail'
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '403':
+          $ref: '#/components/responses/ClientForbidden'
+        '404':
+          $ref: '#/components/responses/NotFoundProblem'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '501':
+          $ref: '#/components/responses/NotImplemented'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /v1/model-defaults:
+    get:
+      tags: [catalog-client]
+      operationId: listClientModelDefaults
+      summary: 客户端每工具默认模型（只含可见且可调用）
+      description: |
+        数据面鉴权（Key + device token）；返回 tool_defaults_for 的客户端投影：
+        default_model 为客户端模型名，switchable_models 仅 visible+allowed；
+        不返回 scope/白名单 UUID/价格/供应商/warnings。空列表 200。
+      security:
+        - virtualKey: []
+          deviceToken: []
+      responses:
+        '200':
+          description: 每工具默认模型列表
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+            X-GW-Catalog-Version:
+              $ref: '#/components/headers/CatalogVersion'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [object, data, catalog_version]
+                properties:
+                  object:
+                    type: string
+                    const: list
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      required: [tool_key, default_model, allow_switch, switchable_models]
+                      properties:
+                        tool_key:
+                          type: string
+                        default_model:
+                          type: string
+                        allow_switch:
+                          type: boolean
+                        switchable_models:
+                          type: array
+                          items:
+                            type: string
+                  catalog_version:
+                    type: string
+        '401':
+          $ref: '#/components/responses/ClientUnauthorized'
+        '403':
+          $ref: '#/components/responses/ClientForbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+
+components:
+  securitySchemes:
+    adminSession:
+      type: apiKey
+      in: cookie
+      name: gw_admin_session
+      description: identity 登录后下发的 HttpOnly Session Cookie
+    virtualKey:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: '虚拟 Key：`Bearer sk-gw-...`（access 数据面鉴权）'
+    deviceToken:
+      type: apiKey
+      in: header
+      name: X-GW-Device-Token
+      description: access 设备短期 token（与 Key 必须属于同一设备）
+  parameters:
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      description: identity 登录或 /me 返回的 CSRF token（43 字符）
+      schema:
+        type: string
+        minLength: 43
+        maxLength: 43
+    ModelGroupId:
+      name: modelGroupId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DeploymentId:
+      name: deploymentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PublicationId:
+      name: publicationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ToolDefaultId:
+      name: toolDefaultId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SuggestionKey:
+      name: suggestionKey
+      in: path
+      required: true
+      description: 聚合建议指纹（sha256 前 32 hex）
+      schema:
+        type: string
+        pattern: '^[a-f0-9]{32}$'
+    ClientModelId:
+      name: modelId
+      in: path
+      required: true
+      description: 客户端模型名（模型组 client_model_name）
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$'
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    Offset:
+      name: offset
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    ModelGroupStatusFilter:
+      name: status
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [draft, active, archived]
+    CanonicalFilter:
+      name: canonical
+      in: query
+      required: false
+      description: canonical 精确匹配（≤100）
+      schema:
+        type: string
+        maxLength: 100
+    QueryFilter:
+      name: q
+      in: query
+      required: false
+      description: 客户端模型名/展示名子串（≤64，不区分大小写）
+      schema:
+        type: string
+        maxLength: 64
+    ModelGroupIdQuery:
+      name: model_group_id
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+    UpstreamModelIdQuery:
+      name: upstream_model_id
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+    ProviderIdQuery:
+      name: provider_id
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+    ProviderAccountIdQuery:
+      name: provider_account_id
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+    EnabledFilter:
+      name: enabled
+      in: query
+      required: false
+      schema:
+        type: boolean
+    UngroupedFilter:
+      name: ungrouped
+      in: query
+      required: false
+      description: 仅返回未归属模型组的部署（聚合候选）
+      schema:
+        type: boolean
+    PublicationStatusFilter:
+      name: status
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [active, paused]
+    SubjectTypeFilter:
+      name: subject_type
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [all_users, user, user_group, application, device]
+    SubjectIdFilter:
+      name: subject_id
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+    ToolKeyFilter:
+      name: tool_key
+      in: query
+      required: false
+      schema:
+        type: string
+        pattern: '^[a-z][a-z0-9_]{0,63}$'
+    ScopeTypeFilter:
+      name: scope_type
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [global, user_group, user]
+    ScopeIdFilter:
+      name: scope_id
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+    UserIdQuery:
+      name: user_id
+      in: query
+      required: true
+      description: 预览目标员工
+      schema:
+        type: string
+        format: uuid
+    DeviceIdQuery:
+      name: device_id
+      in: query
+      required: false
+      description: 可选：按设备投影（device 发布对象仅预留）
+      schema:
+        type: string
+        format: uuid
+    KeyIdQuery:
+      name: key_id
+      in: query
+      required: false
+      description: 可选：按该用户的 Key 白名单进一步过滤
+      schema:
+        type: string
+        format: uuid
+  headers:
+    RequestId:
+      description: 请求 ID，与服务端日志关联
+      schema:
+        type: string
+        example: 0f8a5dd0-7d6f-4b7e-9f8e-2d0f5b7a6c11
+    NoStore:
+      description: 目录/配置响应不允许缓存
+      schema:
+        type: string
+        example: no-store
+    CatalogVersion:
+      description: 目录版本（cat:<n>；S4 过渡期 routing:<n>）
+      schema:
+        type: string
+        example: 'cat:42'
+  responses:
+    BadRequest:
+      description: JSON/字段/业务前置校验失败
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ValidationProblem'
+          examples:
+            validation_failed:
+              value:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: validation_failed
+                detail: 请求参数不合法
+                errors:
+                  client_model_name: '只允许字母数字与 . _ : -，且不能以符号开头'
+            no_enabled_deployment:
+              value:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: no_enabled_deployment
+                detail: 模型组至少需要一个启用的部署才能激活/发布
+            model_group_not_ready:
+              value:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: model_group_not_ready
+                detail: 模型组未就绪（需 active 且至少一个启用部署）
+            deployment_provider_mismatch:
+              value:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: deployment_provider_mismatch
+                detail: 上游模型与渠道账号必须属于同一供应商
+            canonical_mismatch:
+              value:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: canonical_mismatch
+                detail: 部署上游模型的 canonical 与模型组不一致
+            model_group_not_active:
+              value:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: model_group_not_active
+                detail: 模型组状态不允许该操作（工具默认需 active；部署不可入组 archived 组）
+            target_type_not_supported:
+              value:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: target_type_not_supported
+                detail: 该发布对象类型 v0.1.x 预留（仅支持 all_users / user）
+            unsupported_scope:
+              value:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: unsupported_scope
+                detail: 该工具默认作用域 v0.1.x 预留（仅支持 global / user）
+            suggestion_not_mergeable:
+              value:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: suggestion_not_mergeable
+                detail: 该建议为「保持独立」（版本/变体不同），不能确认合并
+    NotAuthenticated:
+      description: 未登录/Session 过期
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            not_authenticated:
+              value:
+                type: about:blank
+                title: Unauthorized
+                status: 401
+                code: not_authenticated
+                detail: 请先登录
+    CsrfInvalid:
+      description: CSRF token 缺失或不正确
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            csrf_invalid:
+              value:
+                type: about:blank
+                title: Forbidden
+                status: 403
+                code: csrf_invalid
+                detail: CSRF token 不正确或已过期
+    NotFoundProblem:
+      description: 对象不存在或客户端模型不可见
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            model_group_not_found:
+              value:
+                type: about:blank
+                title: Not Found
+                status: 404
+                code: model_group_not_found
+                detail: 模型组不存在
+            deployment_not_found:
+              value:
+                type: about:blank
+                title: Not Found
+                status: 404
+                code: deployment_not_found
+                detail: 部署不存在
+            publication_not_found:
+              value:
+                type: about:blank
+                title: Not Found
+                status: 404
+                code: publication_not_found
+                detail: 发布不存在
+            tool_model_default_not_found:
+              value:
+                type: about:blank
+                title: Not Found
+                status: 404
+                code: tool_model_default_not_found
+                detail: 工具默认模型不存在
+            suggestion_not_found:
+              value:
+                type: about:blank
+                title: Not Found
+                status: 404
+                code: suggestion_not_found
+                detail: 聚合建议不存在或已失效，请刷新列表
+            upstream_model_not_found:
+              value:
+                type: about:blank
+                title: Not Found
+                status: 404
+                code: upstream_model_not_found
+                detail: 上游模型不存在
+            provider_account_not_found:
+              value:
+                type: about:blank
+                title: Not Found
+                status: 404
+                code: provider_account_not_found
+                detail: 渠道账号不存在
+            user_not_found:
+              value:
+                type: about:blank
+                title: Not Found
+                status: 404
+                code: user_not_found
+                detail: 员工用户不存在
+            device_not_found:
+              value:
+                type: about:blank
+                title: Not Found
+                status: 404
+                code: device_not_found
+                detail: 设备不存在
+            key_not_found:
+              value:
+                type: about:blank
+                title: Not Found
+                status: 404
+                code: key_not_found
+                detail: Key 不存在或不属于该用户
+            model_not_found:
+              value:
+                type: about:blank
+                title: Not Found
+                status: 404
+                code: model_not_found
+                detail: 模型不存在或未发布给当前用户
+    ConflictProblem:
+      description: 唯一冲突/发布 1:1/建议失效
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            client_model_name_conflict:
+              value:
+                type: about:blank
+                title: Conflict
+                status: 409
+                code: client_model_name_conflict
+                detail: 客户端模型名已被占用
+            deployment_conflict:
+              value:
+                type: about:blank
+                title: Conflict
+                status: 409
+                code: deployment_conflict
+                detail: 该上游模型在该账号下已有部署
+            publication_conflict:
+              value:
+                type: about:blank
+                title: Conflict
+                status: 409
+                code: publication_conflict
+                detail: 该模型组已有发布（一个模型组只能有一条发布）
+            tool_model_default_conflict:
+              value:
+                type: about:blank
+                title: Conflict
+                status: 409
+                code: tool_model_default_conflict
+                detail: 该工具在该作用域已有默认模型
+            suggestion_stale:
+              value:
+                type: about:blank
+                title: Conflict
+                status: 409
+                code: suggestion_stale
+                detail: 建议的部署集合已变化，请刷新后重试
+    InternalError:
+      description: 未预期错误
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            internal_error:
+              value:
+                type: about:blank
+                title: Internal Server Error
+                status: 500
+                code: internal_error
+                detail: 服务器内部错误，请稍后重试并提供 x-request-id
+    DatabaseUnavailable:
+      description: 数据库/依赖不可用
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            database_unavailable:
+              value:
+                type: about:blank
+                title: Service Unavailable
+                status: 503
+                code: database_unavailable
+                detail: 数据库暂不可用
+    ClientUnauthorized:
+      description: 数据面 Key/设备令牌无效
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            invalid_api_key:
+              value:
+                type: about:blank
+                title: Unauthorized
+                status: 401
+                code: invalid_api_key
+                detail: Key 无效或不存在
+            invalid_device_token:
+              value:
+                type: about:blank
+                title: Unauthorized
+                status: 401
+                code: invalid_device_token
+                detail: 设备令牌无效或已过期
+            key_revoked:
+              value:
+                type: about:blank
+                title: Unauthorized
+                status: 401
+                code: key_revoked
+                detail: Key 已吊销
+            key_expired:
+              value:
+                type: about:blank
+                title: Unauthorized
+                status: 401
+                code: key_expired
+                detail: Key 已过期
+            key_device_mismatch:
+              value:
+                type: about:blank
+                title: Unauthorized
+                status: 401
+                code: key_device_mismatch
+                detail: Key 与设备令牌不属于同一设备
+    ClientForbidden:
+      description: 数据面用户/设备禁用
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            user_disabled:
+              value:
+                type: about:blank
+                title: Forbidden
+                status: 403
+                code: user_disabled
+                detail: 用户已被禁用
+            device_disabled:
+              value:
+                type: about:blank
+                title: Forbidden
+                status: 403
+                code: device_disabled
+                detail: 设备已被禁用
+    NotImplemented:
+      description: 计划中端点（S4 过渡期 /v1/models/{id}）
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            not_implemented:
+              value:
+                type: about:blank
+                title: Not Implemented
+                status: 501
+                code: not_implemented
+                detail: 模型详情目录在 v0.1.x 提供
+  schemas:
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          default: about:blank
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          type: string
+        detail:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: string
+          description: 仅 400 validation_failed
+    ValidationProblem:
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          required: [errors]
+          properties:
+            errors:
+              type: object
+              additionalProperties:
+                type: string
+    Page:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        total:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 1
+        offset:
+          type: integer
+          minimum: 0
+    Enforcement:
+      type: object
+      description: 执行面标注：visible/allowed 强制；quota/data_level v0.1.x 仅配置面
+      required: [visible, allowed, quota, data_level]
+      properties:
+        visible:
+          type: string
+          enum: [enforced]
+        allowed:
+          type: string
+          enum: [enforced]
+        quota:
+          type: string
+          enum: [config_only]
+        data_level:
+          type: string
+          enum: [config_only]
+    ModelGroupSummary:
+      type: object
+      required:
+        - id
+        - client_model_name
+        - display_name
+        - canonical
+        - status
+        - capabilities
+        - context_window
+        - max_output
+        - deployment_count
+        - enabled_deployment_count
+        - publication_status
+        - tool_default_count
+        - warnings
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        client_model_name:
+          type: string
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$'
+        display_name:
+          type: string
+          maxLength: 128
+        canonical:
+          type: string
+          maxLength: 100
+        status:
+          type: string
+          enum: [draft, active, archived]
+        capabilities:
+          type: array
+          maxItems: 32
+          items:
+            type: string
+            pattern: '^[a-z][a-z0-9_]{0,31}$'
+        context_window:
+          type: [integer, 'null']
+          minimum: 1
+        max_output:
+          type: [integer, 'null']
+          minimum: 1
+        deployment_count:
+          type: integer
+          minimum: 0
+        enabled_deployment_count:
+          type: integer
+          minimum: 0
+        publication_status:
+          type: [string, 'null']
+          enum: [active, paused, null]
+        tool_default_count:
+          type: integer
+          minimum: 0
+        warnings:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ModelGroupAdmin:
+      allOf:
+        - $ref: '#/components/schemas/ModelGroupSummary'
+        - type: object
+          required:
+            - description
+            - protocols
+            - parameters
+            - price_input
+            - price_output
+            - currency
+            - deployments
+            - publications
+          properties:
+            description:
+              type: string
+              maxLength: 500
+            protocols:
+              type: array
+              maxItems: 8
+              items:
+                type: string
+                enum: [openai_chat, anthropic_messages, openai_responses, gemini_generate_content]
+            parameters:
+              type: object
+              additionalProperties: true
+            price_input:
+              type: [number, 'null']
+              minimum: 0
+            price_output:
+              type: [number, 'null']
+              minimum: 0
+            currency:
+              type: string
+              enum: [CNY, USD]
+            deployments:
+              type: array
+              items:
+                $ref: '#/components/schemas/DeploymentAdmin'
+            publications:
+              type: array
+              maxItems: 1
+              items:
+                $ref: '#/components/schemas/PublicationSummary'
+    ModelGroupPage:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/ModelGroupSummary'
+    ModelGroupDeploymentInput:
+      type: object
+      additionalProperties: false
+      required: [upstream_model_id, provider_account_id]
+      properties:
+        upstream_model_id:
+          type: string
+          format: uuid
+        provider_account_id:
+          type: string
+          format: uuid
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          default: 1
+        weight:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 100
+        enabled:
+          type: boolean
+          default: true
+        notes:
+          type: string
+          maxLength: 500
+    ModelGroupCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [client_model_name, canonical]
+      properties:
+        client_model_name:
+          type: string
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$'
+        display_name:
+          type: string
+          maxLength: 128
+          default: ''
+        canonical:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+          default: ''
+        capabilities:
+          type: array
+          maxItems: 32
+          items:
+            type: string
+            pattern: '^[a-z][a-z0-9_]{0,31}$'
+        context_window:
+          type: integer
+          minimum: 1
+        max_output:
+          type: integer
+          minimum: 1
+        protocols:
+          type: array
+          maxItems: 8
+          items:
+            type: string
+            enum: [openai_chat, anthropic_messages, openai_responses, gemini_generate_content]
+        parameters:
+          type: object
+          additionalProperties: true
+        price_input:
+          type: number
+          minimum: 0
+        price_output:
+          type: number
+          minimum: 0
+        currency:
+          type: string
+          enum: [CNY, USD]
+          default: CNY
+        status:
+          type: string
+          enum: [draft, active]
+          default: draft
+        deployments:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/ModelGroupDeploymentInput'
+    ModelGroupUpdateRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        client_model_name:
+          type: string
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$'
+        display_name:
+          type: string
+          maxLength: 128
+        canonical:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        capabilities:
+          type: array
+          maxItems: 32
+          items:
+            type: string
+            pattern: '^[a-z][a-z0-9_]{0,31}$'
+        context_window:
+          type: [integer, 'null']
+          minimum: 1
+        max_output:
+          type: [integer, 'null']
+          minimum: 1
+        protocols:
+          type: array
+          maxItems: 8
+          items:
+            type: string
+            enum: [openai_chat, anthropic_messages, openai_responses, gemini_generate_content]
+        parameters:
+          type: object
+          additionalProperties: true
+        price_input:
+          type: [number, 'null']
+          minimum: 0
+        price_output:
+          type: [number, 'null']
+          minimum: 0
+        currency:
+          type: string
+          enum: [CNY, USD]
+        status:
+          type: string
+          enum: [draft, active, archived]
+    DeploymentAdmin:
+      type: object
+      required:
+        - id
+        - model_group_id
+        - model_group_client_name
+        - upstream_model_id
+        - upstream_model
+        - canonical
+        - provider_id
+        - provider_name
+        - provider_kind
+        - provider_status
+        - provider_account_id
+        - account_name
+        - account_region
+        - account_status
+        - account_health
+        - priority
+        - weight
+        - enabled
+        - price_input
+        - price_output
+        - currency
+        - context_window
+        - max_output
+        - notes
+        - warnings
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        model_group_id:
+          type: [string, 'null']
+          format: uuid
+        model_group_client_name:
+          type: [string, 'null']
+        upstream_model_id:
+          type: string
+          format: uuid
+        upstream_model:
+          type: string
+        canonical:
+          type: string
+        provider_id:
+          type: string
+          format: uuid
+        provider_name:
+          type: string
+        provider_kind:
+          type: string
+        provider_status:
+          type: string
+          enum: [active, disabled]
+        provider_account_id:
+          type: string
+          format: uuid
+        account_name:
+          type: string
+        account_region:
+          type: string
+        account_status:
+          type: string
+          enum: [active, disabled]
+        account_health:
+          type: string
+          enum: [unknown, healthy, unhealthy]
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        weight:
+          type: integer
+          minimum: 1
+          maximum: 100
+        enabled:
+          type: boolean
+        price_input:
+          type: [number, 'null']
+        price_output:
+          type: [number, 'null']
+        currency:
+          type: string
+          enum: [CNY, USD]
+        context_window:
+          type: [integer, 'null']
+        max_output:
+          type: [integer, 'null']
+        notes:
+          type: string
+          maxLength: 500
+        warnings:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    DeploymentPage:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/DeploymentAdmin'
+    DeploymentCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [upstream_model_id, provider_account_id]
+      properties:
+        upstream_model_id:
+          type: string
+          format: uuid
+        provider_account_id:
+          type: string
+          format: uuid
+        model_group_id:
+          type: string
+          format: uuid
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          default: 1
+        weight:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 100
+        enabled:
+          type: boolean
+          default: true
+        notes:
+          type: string
+          maxLength: 500
+    DeploymentUpdateRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        model_group_id:
+          type: [string, 'null']
+          format: uuid
+          description: null = 移出模型组（成为聚合候选）；缺省 = 不改
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        weight:
+          type: integer
+          minimum: 1
+          maximum: 100
+        enabled:
+          type: boolean
+        notes:
+          type: string
+          maxLength: 500
+    ModelGroupRoutePreviewCandidate:
+      type: object
+      required:
+        - deployment_id
+        - upstream_model_id
+        - upstream_model
+        - provider_id
+        - provider_name
+        - provider_status
+        - provider_account_id
+        - account_name
+        - account_status
+        - account_health
+        - priority
+        - weight
+        - enabled
+        - warnings
+      properties:
+        deployment_id:
+          type: string
+          format: uuid
+        upstream_model_id:
+          type: string
+          format: uuid
+        upstream_model:
+          type: string
+        provider_id:
+          type: string
+          format: uuid
+        provider_name:
+          type: string
+        provider_status:
+          type: string
+          enum: [active, disabled]
+        provider_account_id:
+          type: string
+          format: uuid
+        account_name:
+          type: string
+        account_status:
+          type: string
+          enum: [active, disabled]
+        account_health:
+          type: string
+          enum: [unknown, healthy, unhealthy]
+        priority:
+          type: integer
+        weight:
+          type: integer
+        enabled:
+          type: boolean
+        warnings:
+          type: array
+          items:
+            type: string
+    ModelGroupRoutePreview:
+      type: object
+      required: [model_group_id, client_model_name, status, candidates, warnings]
+      properties:
+        model_group_id:
+          type: string
+          format: uuid
+        client_model_name:
+          type: string
+        status:
+          type: string
+          enum: [draft, active, archived]
+        candidates:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModelGroupRoutePreviewCandidate'
+        warnings:
+          type: array
+          items:
+            type: string
+    PublicationSummary:
+      type: object
+      required: [id, status, target_count, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [active, paused]
+        target_count:
+          type: integer
+          minimum: 0
+        updated_at:
+          type: string
+          format: date-time
+    PublicationTargetAdmin:
+      type: object
+      required: [id, subject_type, subject_id, subject_label, visible, allowed]
+      properties:
+        id:
+          type: string
+          format: uuid
+        subject_type:
+          type: string
+          enum: [all_users, user, user_group, application, device]
+        subject_id:
+          type: [string, 'null']
+          format: uuid
+        subject_label:
+          type: [string, 'null']
+        visible:
+          type: boolean
+        allowed:
+          type: boolean
+    PublicationAdmin:
+      type: object
+      required:
+        - id
+        - model_group_id
+        - model_group_client_name
+        - status
+        - data_level_max
+        - quota_rpm
+        - quota_tpm
+        - quota_daily_requests
+        - note
+        - created_by
+        - targets
+        - enforcement
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        model_group_id:
+          type: string
+          format: uuid
+        model_group_client_name:
+          type: string
+        status:
+          type: string
+          enum: [active, paused]
+        data_level_max:
+          type: [integer, 'null']
+          minimum: 1
+          maximum: 4
+        quota_rpm:
+          type: [integer, 'null']
+          minimum: 1
+        quota_tpm:
+          type: [integer, 'null']
+          minimum: 1
+        quota_daily_requests:
+          type: [integer, 'null']
+          minimum: 1
+        note:
+          type: string
+          maxLength: 500
+        created_by:
+          type: [string, 'null']
+          format: uuid
+        targets:
+          type: array
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/PublicationTargetAdmin'
+        enforcement:
+          $ref: '#/components/schemas/Enforcement'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    PublicationPage:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/PublicationAdmin'
+    PublicationTargetInput:
+      type: object
+      additionalProperties: false
+      required: [subject_type]
+      properties:
+        subject_type:
+          type: string
+          enum: [all_users, user, user_group, application, device]
+        subject_id:
+          type: [string, 'null']
+          format: uuid
+        visible:
+          type: boolean
+          default: true
+        allowed:
+          type: boolean
+          default: true
+    PublicationCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [model_group_id, targets]
+      properties:
+        model_group_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [active, paused]
+          default: active
+        data_level_max:
+          type: [integer, 'null']
+          minimum: 1
+          maximum: 4
+        quota_rpm:
+          type: [integer, 'null']
+          minimum: 1
+        quota_tpm:
+          type: [integer, 'null']
+          minimum: 1
+        quota_daily_requests:
+          type: [integer, 'null']
+          minimum: 1
+        note:
+          type: string
+          maxLength: 500
+          default: ''
+        targets:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/PublicationTargetInput'
+    PublicationUpdateRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        status:
+          type: string
+          enum: [active, paused]
+        data_level_max:
+          type: [integer, 'null']
+          minimum: 1
+          maximum: 4
+        quota_rpm:
+          type: [integer, 'null']
+          minimum: 1
+        quota_tpm:
+          type: [integer, 'null']
+          minimum: 1
+        quota_daily_requests:
+          type: [integer, 'null']
+          minimum: 1
+        note:
+          type: string
+          maxLength: 500
+        targets:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/PublicationTargetInput'
+    ModelGroupRef:
+      type: object
+      required: [id, client_model_name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        client_model_name:
+          type: string
+    ToolModelDefaultAdmin:
+      type: object
+      required:
+        - id
+        - tool_key
+        - scope_type
+        - scope_id
+        - scope_label
+        - default_model_group_id
+        - default_model_client_name
+        - allow_switch
+        - allowed_model_groups
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+        tool_key:
+          type: string
+          pattern: '^[a-z][a-z0-9_]{0,63}$'
+        scope_type:
+          type: string
+          enum: [global, user_group, user]
+        scope_id:
+          type: [string, 'null']
+          format: uuid
+        scope_label:
+          type: [string, 'null']
+        default_model_group_id:
+          type: string
+          format: uuid
+        default_model_client_name:
+          type: string
+        allow_switch:
+          type: boolean
+        allowed_model_groups:
+          type: array
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/ModelGroupRef'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ToolModelDefaultPage:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/ToolModelDefaultAdmin'
+    ToolModelDefaultCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [tool_key, scope_type, default_model_group_id]
+      properties:
+        tool_key:
+          type: string
+          pattern: '^[a-z][a-z0-9_]{0,63}$'
+        scope_type:
+          type: string
+          enum: [global, user_group, user]
+        scope_id:
+          type: [string, 'null']
+          format: uuid
+        default_model_group_id:
+          type: string
+          format: uuid
+        allow_switch:
+          type: boolean
+          default: false
+        allowed_model_group_ids:
+          type: array
+          maxItems: 50
+          items:
+            type: string
+            format: uuid
+    ToolModelDefaultUpdateRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        default_model_group_id:
+          type: string
+          format: uuid
+        allow_switch:
+          type: boolean
+        allowed_model_group_ids:
+          type: array
+          maxItems: 50
+          items:
+            type: string
+            format: uuid
+    SuggestionDeployment:
+      type: object
+      required:
+        - id
+        - upstream_model_id
+        - upstream_model
+        - canonical
+        - provider_id
+        - provider_name
+        - provider_kind
+        - provider_account_id
+        - account_name
+        - account_region
+        - priority
+        - weight
+        - enabled
+        - price_input
+        - price_output
+        - currency
+        - context_window
+        - max_output
+        - capabilities
+      properties:
+        id:
+          type: string
+          format: uuid
+        upstream_model_id:
+          type: string
+          format: uuid
+        upstream_model:
+          type: string
+        canonical:
+          type: string
+        provider_id:
+          type: string
+          format: uuid
+        provider_name:
+          type: string
+        provider_kind:
+          type: string
+        provider_account_id:
+          type: string
+          format: uuid
+        account_name:
+          type: string
+        account_region:
+          type: string
+        priority:
+          type: integer
+        weight:
+          type: integer
+        enabled:
+          type: boolean
+        price_input:
+          type: [number, 'null']
+        price_output:
+          type: [number, 'null']
+        currency:
+          type: string
+          enum: [CNY, USD]
+        context_window:
+          type: [integer, 'null']
+        max_output:
+          type: [integer, 'null']
+        capabilities:
+          type: array
+          items:
+            type: string
+    RelatedGroup:
+      type: object
+      required: [id, client_model_name, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        client_model_name:
+          type: string
+        status:
+          type: string
+          enum: [draft, active, archived]
+    DiffValue:
+      type: object
+      required: [deployment_id, value]
+      properties:
+        deployment_id:
+          type: string
+          format: uuid
+        value:
+          type: string
+    DiffItem:
+      type: object
+      required: [field, risk_flag, values, note]
+      properties:
+        field:
+          type: string
+        risk_flag:
+          type: string
+        values:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiffValue'
+        note:
+          type: string
+    MergeSuggestion:
+      type: object
+      required:
+        - suggestion_key
+        - canonical
+        - upstream_model_name
+        - recommendation
+        - deployment_count
+        - provider_count
+        - deployments
+        - related_groups
+        - diff
+        - risk_flags
+        - first_seen_at
+      properties:
+        suggestion_key:
+          type: string
+          pattern: '^[a-f0-9]{32}$'
+        canonical:
+          type: string
+        upstream_model_name:
+          type: string
+        recommendation:
+          type: string
+          enum: [merge, keep_separate]
+        deployment_count:
+          type: integer
+          minimum: 2
+        provider_count:
+          type: integer
+          minimum: 1
+        deployments:
+          type: array
+          minItems: 2
+          items:
+            $ref: '#/components/schemas/SuggestionDeployment'
+        related_groups:
+          type: array
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/RelatedGroup'
+        diff:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiffItem'
+        risk_flags:
+          type: array
+          items:
+            type: string
+        first_seen_at:
+          type: string
+          format: date-time
+    MergeSuggestionPage:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              maxItems: 200
+              items:
+                $ref: '#/components/schemas/MergeSuggestion'
+    ConfirmMergeSuggestionRequest:
+      type: object
+      additionalProperties: false
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [create_group, merge_into_group]
+        client_model_name:
+          type: string
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$'
+        display_name:
+          type: string
+          maxLength: 128
+        target_group_id:
+          type: string
+          format: uuid
+    MergeConfirmation:
+      type: object
+      required:
+        - suggestion_key
+        - decision
+        - group
+        - moved_deployment_ids
+        - decided_at
+        - decided_by
+      properties:
+        suggestion_key:
+          type: string
+        decision:
+          type: string
+          enum: [merged]
+        group:
+          $ref: '#/components/schemas/ModelGroupAdmin'
+        moved_deployment_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        decided_at:
+          type: string
+          format: date-time
+        decided_by:
+          type: [string, 'null']
+          format: uuid
+    RejectMergeSuggestionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        note:
+          type: string
+          maxLength: 500
+    MergeRejection:
+      type: object
+      required: [suggestion_key, decision, note, decided_at, decided_by]
+      properties:
+        suggestion_key:
+          type: string
+        decision:
+          type: string
+          enum: [rejected]
+        note:
+          type: string
+          maxLength: 500
+        decided_at:
+          type: string
+          format: date-time
+        decided_by:
+          type: [string, 'null']
+          format: uuid
+    PreviewSubject:
+      type: object
+      required:
+        - user_id
+        - email
+        - display_name
+        - user_status
+        - device_id
+        - device_name
+        - key_id
+        - key_allowed_models
+        - user_group_ids
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        display_name:
+          type: string
+        user_status:
+          type: string
+          enum: [active, disabled]
+        device_id:
+          type: [string, 'null']
+          format: uuid
+        device_name:
+          type: [string, 'null']
+        key_id:
+          type: [string, 'null']
+          format: uuid
+        key_allowed_models:
+          type: array
+          items:
+            type: string
+        user_group_ids:
+          type: array
+          description: v0.1.x 恒空（access 用户组预留）
+          items:
+            type: string
+            format: uuid
+    ClientModel:
+      type: object
+      required:
+        - id
+        - object
+        - created
+        - owned_by
+        - display_name
+        - upstream_model
+        - capabilities
+        - context_window
+        - max_output
+        - protocols
+      properties:
+        id:
+          type: string
+          pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$'
+        object:
+          type: string
+          enum: [model]
+        created:
+          type: integer
+          minimum: 0
+          description: unix 秒
+        owned_by:
+          type: string
+          enum: [gateway]
+        display_name:
+          type: string
+        upstream_model:
+          type: [string, 'null']
+        capabilities:
+          type: array
+          items:
+            type: string
+        context_window:
+          type: [integer, 'null']
+        max_output:
+          type: [integer, 'null']
+        protocols:
+          type: array
+          items:
+            type: string
+            enum: [openai_chat, anthropic_messages, openai_responses, gemini_generate_content]
+    AdminPreviewModel:
+      allOf:
+        - $ref: '#/components/schemas/ClientModel'
+        - type: object
+          required: [visible, allowed, matched_by, publication_id]
+          properties:
+            visible:
+              type: boolean
+            allowed:
+              type: boolean
+            matched_by:
+              type: [string, 'null']
+              enum: [all_users, user, user_group, application, device, null]
+            publication_id:
+              type: [string, 'null']
+              format: uuid
+    AdminPreviewToolDefault:
+      type: object
+      required: [tool_key, scope_type, source, default_model, switchable_models, warnings]
+      properties:
+        tool_key:
+          type: string
+        scope_type:
+          type: string
+          enum: [global, user_group, user]
+        source:
+          type: string
+          enum: [global, user_group, user, none]
+        default_model:
+          type: [string, 'null']
+        switchable_models:
+          type: array
+          items:
+            type: string
+        warnings:
+          type: array
+          items:
+            type: string
+    AdminCatalogPreview:
+      type: object
+      required: [catalog_version, subject, models, tool_defaults, enforcement, warnings]
+      properties:
+        catalog_version:
+          type: string
+        subject:
+          $ref: '#/components/schemas/PreviewSubject'
+        models:
+          type: array
+          description: 与客户端投影同形 + visible/allowed/matched_by 诊断字段（不含价格/供应商/canonical）
+          items:
+            $ref: '#/components/schemas/AdminPreviewModel'
+        tool_defaults:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminPreviewToolDefault'
+        enforcement:
+          $ref: '#/components/schemas/Enforcement'
+        warnings:
+          type: array
+          items:
+            type: string
+    ClientCatalogList:
+      type: object
+      required: [object, data, catalog_version]
+      properties:
+        object:
+          type: string
+          enum: [list]
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientModel'
+        catalog_version:
+          type: string
+          example: 'cat:42'
+    ClientModelDetail:
+      allOf:
+        - $ref: '#/components/schemas/ClientModel'
+        - type: object
+          required: [parameters, catalog_version]
+          properties:
+            parameters:
+              type: object
+              additionalProperties: true
+              description: 参数/协议兼容提示（管理员配置，客户端只读）
+            catalog_version:
+              type: string

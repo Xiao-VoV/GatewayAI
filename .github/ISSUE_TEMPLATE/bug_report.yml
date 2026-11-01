@@ -1,0 +1,47 @@
+name: Bug 报告
+description: 报告可复现的问题
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！提交前请先搜索是否已有相同 issue；安全漏洞请勿在此公开，按 SECURITY.md 私下报告。
+  - type: input
+    id: version
+    attributes:
+      label: 版本 / 提交
+      description: 例如 v0.1.0、main 分支某个 commit
+      placeholder: v0.1.0 / main@abc1234
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 问题描述
+      description: 实际发生了什么？预期是什么？
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      description: 越具体越好：请求、命令、环境变量、数据状态（请勿粘贴真实密钥）
+      placeholder: |
+        1. docker compose up -d postgres
+        2. cp server/.env.example server/.env
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志 / 报错
+      description: 请先脱敏（密钥、Cookie、连接串口令）
+      render: shell
+  - type: input
+    id: env
+    attributes:
+      label: 运行环境
+      description: 操作系统、Rust 版本、PostgreSQL 版本、部署方式
+      placeholder: macOS 15 / rustc 1.9x / PG 16 / docker compose

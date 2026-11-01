@@ -1,0 +1,1305 @@
+openapi: 3.1.0
+x-module: providers
+x-status: design-v0.2
+info:
+  title: AI Gateway - Providers API
+  version: 0.2.0
+  description: |
+    供应商与渠道管理（providers）管理台 API 契约。语义说明见同目录的 接口设计.md。
+
+    约定：
+    - 仅管理台使用；`/v1/*`、`/api/client/*` 不访问本模块。
+    - 鉴权：identity 的 `gw_admin_session` Cookie；写请求必须带 `X-CSRF-Token`。
+    - 所有响应带 `x-request-id` 与 `Cache-Control: no-store`。
+    - 凭证只写不读：请求可带 `api_key`，响应只返回 `api_key_hint`。
+    - 错误统一 `application/problem+json`，带稳定 `code`。
+servers:
+  - url: http://127.0.0.1:8080
+    description: 本地开发
+tags:
+  - name: providers
+    description: 供应商、渠道账号、上游模型与连通性测试
+paths:
+  /api/admin/providers:
+    get:
+      tags: [providers]
+      operationId: listProviders
+      summary: 供应商列表
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/StatusFilter'
+        - $ref: '#/components/parameters/KindFilter'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: 供应商分页列表
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    post:
+      tags: [providers]
+      operationId: createProvider
+      summary: 创建供应商（含第一个渠道账号）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProviderRequest'
+            examples:
+              default:
+                value:
+                  name: DeepSeek
+                  kind: openai_compatible
+                  base_url: https://api.deepseek.com/v1
+                  description: 主力供应商
+                  account:
+                    name: 主账号
+                    api_key: sk-1234abcd
+                    region: cn
+                    weight: 100
+                    priority: 1
+                    rpm_limit: 600
+      responses:
+        '201':
+          description: 创建成功（provider + 首个账号）
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateProviderResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/CredentialUnavailableOrInternal'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/providers/{providerId}:
+    parameters:
+      - $ref: '#/components/parameters/ProviderId'
+    get:
+      tags: [providers]
+      operationId: getProvider
+      summary: 供应商详情（含引用计数）
+      security:
+        - adminSession: []
+      responses:
+        '200':
+          description: 供应商详情
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderDetail'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    patch:
+      tags: [providers]
+      operationId: updateProvider
+      summary: 更新供应商
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchProviderRequest'
+      responses:
+        '200':
+          description: 更新后的供应商
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Provider'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    delete:
+      tags: [providers]
+      operationId: deleteProvider
+      summary: 删除供应商（被模型别名引用时禁止）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: 已删除
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/providers/{providerId}/test:
+    parameters:
+      - $ref: '#/components/parameters/ProviderId'
+    post:
+      tags: [providers]
+      operationId: testProvider
+      summary: 连通性测试（供应商级，可指定账号）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestRequest'
+      responses:
+        '200':
+          description: 测试结果（ok=false 表示上游不可用）
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/CredentialUnavailableOrInternal'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/providers/{providerId}/accounts:
+    parameters:
+      - $ref: '#/components/parameters/ProviderId'
+    get:
+      tags: [providers]
+      operationId: listProviderAccounts
+      summary: 渠道账号列表
+      security:
+        - adminSession: []
+      responses:
+        '200':
+          description: 账号列表
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    post:
+      tags: [providers]
+      operationId: createProviderAccount
+      summary: 新增渠道账号
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAccountRequest'
+      responses:
+        '201':
+          description: 创建成功（仅返回 api_key_hint）
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderAccount'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/CredentialUnavailableOrInternal'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/providers/{providerId}/accounts/{accountId}:
+    parameters:
+      - $ref: '#/components/parameters/ProviderId'
+      - $ref: '#/components/parameters/AccountId'
+    patch:
+      tags: [providers]
+      operationId: updateProviderAccount
+      summary: 更新账号（含凭证轮换）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchAccountRequest'
+      responses:
+        '200':
+          description: 更新后的账号（仅 hint）
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderAccount'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/CredentialUnavailableOrInternal'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    delete:
+      tags: [providers]
+      operationId: deleteProviderAccount
+      summary: 删除渠道账号（被 deployments 引用时 409）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: 已删除
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/providers/{providerId}/accounts/{accountId}/test:
+    parameters:
+      - $ref: '#/components/parameters/ProviderId'
+      - $ref: '#/components/parameters/AccountId'
+    post:
+      tags: [providers]
+      operationId: testProviderAccount
+      summary: 连通性测试（指定账号）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '200':
+          description: 测试结果
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestResult'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/CredentialUnavailableOrInternal'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/providers/{providerId}/models:
+    parameters:
+      - $ref: '#/components/parameters/ProviderId'
+    get:
+      tags: [providers]
+      operationId: listUpstreamModels
+      summary: 上游模型列表
+      security:
+        - adminSession: []
+      responses:
+        '200':
+          description: 模型列表
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    post:
+      tags: [providers]
+      operationId: createUpstreamModel
+      summary: 新增上游模型
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateModelRequest'
+      responses:
+        '201':
+          description: 创建成功
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpstreamModel'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/providers/{providerId}/models/{modelId}:
+    parameters:
+      - $ref: '#/components/parameters/ProviderId'
+      - $ref: '#/components/parameters/ModelId'
+    patch:
+      tags: [providers]
+      operationId: updateUpstreamModel
+      summary: 更新上游模型
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchModelRequest'
+      responses:
+        '200':
+          description: 更新后的模型
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpstreamModel'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    delete:
+      tags: [providers]
+      operationId: deleteUpstreamModel
+      summary: 删除上游模型（被模型别名引用时禁止）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: 已删除
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+components:
+  securitySchemes:
+    adminSession:
+      type: apiKey
+      in: cookie
+      name: gw_admin_session
+      description: identity 登录后下发的 HttpOnly Session Cookie
+  parameters:
+    ProviderId:
+      name: providerId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    AccountId:
+      name: accountId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ModelId:
+      name: modelId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      description: identity 登录或 /me 返回的 CSRF token（43 字符）
+      schema:
+        type: string
+        minLength: 43
+        maxLength: 43
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    Offset:
+      name: offset
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    StatusFilter:
+      name: status
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [active, disabled]
+    KindFilter:
+      name: kind
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [openai_compatible]
+  headers:
+    NoStore:
+      description: 供应商/凭证数据不能被缓存
+      schema:
+        type: string
+        example: no-store
+    RequestId:
+      description: 请求 ID，与服务端日志关联
+      schema:
+        type: string
+        example: 0f8a5dd0-7d6f-4b7e-9f8e-2d0f5b7a6c11
+  responses:
+    BadRequest:
+      description: 字段校验失败，或 kind 不支持
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            validation_failed:
+              value:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: validation_failed
+                detail: 请求参数不合法
+                errors:
+                  base_url: base_url 必须是 http/https
+            unsupported_kind:
+              value:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: unsupported_kind
+                detail: S2 仅支持 openai_compatible 供应商
+            too_many_items:
+              value:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: too_many_items
+                detail: 子项数量超过上限（账号 50 / 模型 200），后续版本将支持分页
+    NotAuthenticated:
+      description: 未登录或会话已过期
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            not_authenticated:
+              value:
+                type: about:blank
+                title: Unauthorized
+                status: 401
+                code: not_authenticated
+                detail: 请先登录
+    CsrfInvalid:
+      description: CSRF token 缺失或不正确
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            csrf_invalid:
+              value:
+                type: about:blank
+                title: Forbidden
+                status: 403
+                code: csrf_invalid
+                detail: CSRF token 不正确或已过期
+    NotFound:
+      description: 对象不存在
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            provider_not_found:
+              value:
+                type: about:blank
+                title: Not Found
+                status: 404
+                code: provider_not_found
+                detail: 供应商不存在
+            account_not_found:
+              value:
+                type: about:blank
+                title: Not Found
+                status: 404
+                code: account_not_found
+                detail: 渠道账号不存在
+            upstream_model_not_found:
+              value:
+                type: about:blank
+                title: Not Found
+                status: 404
+                code: upstream_model_not_found
+                detail: 上游模型不存在
+    Conflict:
+      description: 名称冲突或对象被引用
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            provider_name_conflict:
+              value:
+                type: about:blank
+                title: Conflict
+                status: 409
+                code: provider_name_conflict
+                detail: 供应商名称已存在
+            account_name_conflict:
+              value:
+                type: about:blank
+                title: Conflict
+                status: 409
+                code: account_name_conflict
+                detail: 该供应商下账号名称已存在
+            upstream_model_conflict:
+              value:
+                type: about:blank
+                title: Conflict
+                status: 409
+                code: upstream_model_conflict
+                detail: 该供应商下上游模型名已存在
+            provider_in_use:
+              value:
+                type: about:blank
+                title: Conflict
+                status: 409
+                code: provider_in_use
+                detail: 供应商仍被 2 个模型别名引用，不能删除
+                references:
+                  accounts: 1
+                  upstream_models: 3
+                  model_aliases: 2
+            upstream_model_in_use:
+              value:
+                type: about:blank
+                title: Conflict
+                status: 409
+                code: upstream_model_in_use
+                detail: 上游模型仍被 2 个模型别名引用，不能删除
+                references:
+                  model_aliases: 2
+    DatabaseUnavailable:
+      description: 数据库不可用
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            database_unavailable:
+              value:
+                type: about:blank
+                title: Service Unavailable
+                status: 503
+                code: database_unavailable
+                detail: 数据库暂不可用
+    InternalError:
+      description: 未预期错误（不返回内部细节）
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            internal_error:
+              value:
+                type: about:blank
+                title: Internal Server Error
+                status: 500
+                code: internal_error
+                detail: 服务器内部错误，请稍后重试并提供 x-request-id
+    CredentialUnavailableOrInternal:
+      description: 主密钥/解密异常或未预期错误
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            credential_unavailable:
+              value:
+                type: about:blank
+                title: Internal Server Error
+                status: 500
+                code: credential_unavailable
+                detail: 凭证暂不可用，请联系运维检查主密钥
+            internal_error:
+              value:
+                type: about:blank
+                title: Internal Server Error
+                status: 500
+                code: internal_error
+                detail: 服务器内部错误，请稍后重试并提供 x-request-id
+  schemas:
+    Provider:
+      type: object
+      required: [id, name, kind, base_url, description, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 100
+        kind:
+          type: string
+          enum: [openai_compatible]
+        base_url:
+          type: string
+          maxLength: 512
+        description:
+          type: string
+          maxLength: 500
+        status:
+          type: string
+          enum: [active, disabled]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ProviderDetail:
+      allOf:
+        - $ref: '#/components/schemas/Provider'
+        - type: object
+          required: [account_count, active_account_count, upstream_model_count, model_alias_count, routable]
+          properties:
+            account_count:
+              type: integer
+              minimum: 0
+            active_account_count:
+              type: integer
+              minimum: 0
+            upstream_model_count:
+              type: integer
+              minimum: 0
+            model_alias_count:
+              type: integer
+              minimum: 0
+            routable:
+              type: boolean
+    ProviderPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Provider'
+        total:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+        offset:
+          type: integer
+    ProviderAccount:
+      type: object
+      required: [id, provider_id, name, region, api_key_hint, weight, priority, rpm_limit, tpm_limit, health, status, last_checked_at, last_error, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 100
+        region:
+          type: string
+          maxLength: 64
+        api_key_hint:
+          type: string
+          maxLength: 32
+          description: 掩码（如 sk-…abcd）；永不返回明文或密文
+        weight:
+          type: integer
+          minimum: 0
+          maximum: 100
+        priority:
+          type: integer
+          minimum: 1
+        rpm_limit:
+          type: [integer, 'null']
+        tpm_limit:
+          type: [integer, 'null']
+        health:
+          type: string
+          enum: [unknown, healthy, unhealthy]
+        status:
+          type: string
+          enum: [active, disabled]
+        last_checked_at:
+          type: [string, 'null']
+          format: date-time
+        last_error:
+          type: [string, 'null']
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    AccountList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProviderAccount'
+    UpstreamModel:
+      type: object
+      required: [id, provider_id, name, canonical, capabilities, context_window, max_output, price_input, price_output, currency, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        provider_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          maxLength: 200
+        canonical:
+          type: string
+          maxLength: 100
+        capabilities:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 32
+        context_window:
+          type: [integer, 'null']
+        max_output:
+          type: [integer, 'null']
+        price_input:
+          type: [number, 'null']
+          multipleOf: 0.000001
+        price_output:
+          type: [number, 'null']
+          multipleOf: 0.000001
+        currency:
+          type: string
+          enum: [CNY, USD]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ModelList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/UpstreamModel'
+    TestResult:
+      type: object
+      required: [ok, latency_ms, checked_at]
+      properties:
+        ok:
+          type: boolean
+        latency_ms:
+          type: integer
+          minimum: 0
+        checked_at:
+          type: string
+          format: date-time
+        account_id:
+          type: [string, 'null']
+          format: uuid
+        http_status:
+          type: [integer, 'null']
+        error:
+          oneOf:
+            - type: 'null'
+            - $ref: '#/components/schemas/TestError'
+    TestError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: |
+            timeout=10s 未完成；dns_error=解析失败；connect_error=连接失败；
+            unauthorized/forbidden=401/403；not_found=端点 404 或指定 model 不在目录；
+            upstream_error=其他非 2xx；no_account=无 active 账号；credential_unavailable=解密失败
+          enum: [timeout, dns_error, connect_error, unauthorized, forbidden, not_found, upstream_error, unsupported_kind, no_account, credential_unavailable]
+        message:
+          type: string
+    CreateProviderRequest:
+      type: object
+      additionalProperties: false
+      required: [name, kind, base_url, account]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        kind:
+          type: string
+          enum: [openai_compatible]
+        base_url:
+          type: string
+          maxLength: 512
+          pattern: '^https?://'
+        description:
+          type: string
+          maxLength: 500
+          default: ''
+        account:
+          $ref: '#/components/schemas/CreateAccountRequest'
+    CreateProviderResponse:
+      type: object
+      required: [provider, account]
+      properties:
+        provider:
+          $ref: '#/components/schemas/Provider'
+        account:
+          $ref: '#/components/schemas/ProviderAccount'
+    PatchProviderRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        base_url:
+          type: string
+          maxLength: 512
+          pattern: '^https?://'
+        description:
+          type: string
+          maxLength: 500
+        status:
+          type: string
+          enum: [active, disabled]
+    CreateAccountRequest:
+      type: object
+      additionalProperties: false
+      required: [name, api_key]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        api_key:
+          type: string
+          writeOnly: true
+          minLength: 1
+          maxLength: 4096
+          description: 上游 API Key；响应永不返回
+        region:
+          type: string
+          maxLength: 64
+          default: ''
+        weight:
+          type: integer
+          minimum: 0
+          maximum: 100
+          default: 100
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          default: 1
+        rpm_limit:
+          type: [integer, 'null']
+          minimum: 1
+        tpm_limit:
+          type: [integer, 'null']
+          minimum: 1
+    PatchAccountRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        api_key:
+          type: string
+          writeOnly: true
+          minLength: 1
+          maxLength: 4096
+        region:
+          type: string
+          maxLength: 64
+        weight:
+          type: integer
+          minimum: 0
+          maximum: 100
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 1000
+        rpm_limit:
+          type: [integer, 'null']
+          minimum: 1
+        tpm_limit:
+          type: [integer, 'null']
+          minimum: 1
+        status:
+          type: string
+          enum: [active, disabled]
+    TestRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        account_id:
+          type: string
+          format: uuid
+        model:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: 可选；提供时校验该模型是否在上游 /models 目录中（未命中 error.code=not_found）
+    CreateModelRequest:
+      type: object
+      additionalProperties: false
+      required: [name, canonical]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        canonical:
+          type: string
+          minLength: 1
+          maxLength: 100
+        capabilities:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            minLength: 1
+            maxLength: 32
+          default: []
+        context_window:
+          type: [integer, 'null']
+          minimum: 1
+        max_output:
+          type: [integer, 'null']
+          minimum: 1
+        price_input:
+          type: [number, 'null']
+          minimum: 0
+          multipleOf: 0.000001
+        price_output:
+          type: [number, 'null']
+          minimum: 0
+          multipleOf: 0.000001
+        currency:
+          type: string
+          enum: [CNY, USD]
+          default: CNY
+    PatchModelRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        canonical:
+          type: string
+          minLength: 1
+          maxLength: 100
+        capabilities:
+          type: array
+          maxItems: 20
+          items:
+            type: string
+            minLength: 1
+            maxLength: 32
+        context_window:
+          type: [integer, 'null']
+          minimum: 1
+        max_output:
+          type: [integer, 'null']
+          minimum: 1
+        price_input:
+          type: [number, 'null']
+          minimum: 0
+          multipleOf: 0.000001
+        price_output:
+          type: [number, 'null']
+          minimum: 0
+          multipleOf: 0.000001
+        currency:
+          type: string
+          enum: [CNY, USD]
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          default: about:blank
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          type: string
+          description: 稳定错误码，前端按它处理
+        detail:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: string
+          description: 字段名 → 可读错误（仅 400 validation_failed）
+        references:
+          type: object
+          description: 引用计数（仅 409 provider_in_use / upstream_model_in_use）
+          additionalProperties:
+            type: integer

@@ -1,0 +1,28 @@
+# Rust
+server/target/
+target/
+
+# Node
+node_modules/
+dist/
+.pnpm-store/
+
+# 本地环境与密钥
+.env
+.env.*
+!.env.example
+server/data/
+*.pem
+*.key
+*.crt
+secrets/
+
+# Tauri 生成物
+apps/client/src-tauri/gen/
+
+# 系统 / 编辑器
+.DS_Store
+*.local
+.idea/
+.vscode/
+.cache/

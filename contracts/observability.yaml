@@ -1,0 +1,790 @@
+openapi: 3.1.0
+x-module: observability
+x-status: implemented-v0.1
+info:
+  title: AI Gateway - Observability Request Logs API
+  version: 0.1.0
+  description: |
+    请求元数据日志的管理台只读契约：列表、详情（详情合并 metering 的 usage 块）。
+    语义见同目录 接口设计.md / 技术设计.md；数据库见 数据库设计.md。
+
+    约定：
+    - 管理台：identity `gw_admin_session` Cookie（只读，无 CSRF）。
+    - 只存元数据；不存请求/响应正文、Authorization、x-api-key、完整 Key/token、Cookie（US-035）。
+    - 所有响应 `x-request-id` + `Cache-Control: no-store`；错误 application/problem+json。
+    - `/api/admin/audit`、`/api/admin/requests/export`、`/api/admin/audit/export` 已实现；CSV 上限 10 万行。
+    - 数据面 `/v1/*`（含 `/v1/models`，owner=catalog）不在本契约。
+servers:
+  - url: http://127.0.0.1:8080
+    description: 本地开发
+tags:
+  - name: observability-admin
+    description: 管理台请求日志检索（只读）
+paths:
+  /api/admin/requests:
+    get:
+      tags: [observability-admin]
+      operationId: listRequestLogs
+      summary: 请求日志列表（筛选 + 分页）
+      description: |
+        默认最近 24 小时；时间倒序；筛选条件可组合（时间/用户/设备/Key/Key 前缀/模型/供应商/状态/trace）。
+        无数据返回 200 + 空 items；COUNT 与分页查询在同一只读快照事务内执行。
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/UserIdFilter'
+        - $ref: '#/components/parameters/DeviceIdFilter'
+        - $ref: '#/components/parameters/KeyIdFilter'
+        - $ref: '#/components/parameters/KeyPrefixFilter'
+        - $ref: '#/components/parameters/ModelFilter'
+        - $ref: '#/components/parameters/ProviderFilter'
+        - $ref: '#/components/parameters/StatusClassFilter'
+        - $ref: '#/components/parameters/StatusCodeFilter'
+        - $ref: '#/components/parameters/TraceIdFilter'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: 请求日志分页
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestLogPage'
+              examples:
+                withItems:
+                  value:
+                    items:
+                      - id: 0f8a5dd0-7d6f-4b7e-9f8e-2d0f5b7a6c11
+                        request_id: 6a1c9e40-1f77-4a64-9d8e-0b9f2a5e6c11
+                        trace_id: 6a1c9e40-1f77-4a64-9d8e-0b9f2a5e6c11
+                        created_at: '2026-10-30T09:59:58Z'
+                        method: POST
+                        path: /v1/chat/completions
+                        protocol: chat_completions
+                        upstream_protocol: openai_chat
+                        adapter: chat_passthrough
+                        user_id: 2b8d4c1e-6a7f-4b3c-9d2e-8f1a5c7b9e01
+                        device_id: 9a2f3b4c-5d6e-4f70-8123-456789abcdef
+                        key_id: b41c2d3e-4f50-4612-3789-abcdef012345
+                        key_prefix: sk-gw-abcd
+                        model_alias: fast
+                        upstream_model: deepseek-chat
+                        provider: DeepSeek
+                        provider_id: c0f1e2d3-4b5a-4968-8778-99aabbccddee
+                        is_stream: true
+                        fallback: false
+                        attempt_count: 1
+                        status_code: 200
+                        latency_ms: 1840
+                        ttft_ms: 420
+                        response_size: 15320
+                        error_code: null
+                        client_ip: 10.0.3.7
+                        user_agent: Claude-Code/1.2.3
+                    total: 1043
+                    limit: 50
+                    offset: 0
+                empty:
+                  value:
+                    items: []
+                    total: 0
+                    limit: 50
+                    offset: 0
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/requests/{request_id}:
+    parameters:
+      - $ref: '#/components/parameters/RequestId'
+    get:
+      tags: [observability-admin]
+      operationId: getRequestLog
+      summary: 请求日志详情（含 metering usage 块）
+      description: |
+        按 request_id 精确查询；合并 metering 的 usage（tokens/成本/状态）。
+        非推理请求（如 /v1/models）或 metering 暂不可用时 usage=null，详情仍 200。
+      security:
+        - adminSession: []
+      responses:
+        '200':
+          description: 请求日志详情
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestLogDetail'
+              examples:
+                withUsage:
+                  value:
+                    id: 0f8a5dd0-7d6f-4b7e-9f8e-2d0f5b7a6c11
+                    request_id: 6a1c9e40-1f77-4a64-9d8e-0b9f2a5e6c11
+                    trace_id: 6a1c9e40-1f77-4a64-9d8e-0b9f2a5e6c11
+                    created_at: '2026-10-30T09:59:58Z'
+                    method: POST
+                    path: /v1/chat/completions
+                    protocol: chat_completions
+                    upstream_protocol: openai_chat
+                    adapter: chat_passthrough
+                    user_id: 2b8d4c1e-6a7f-4b3c-9d2e-8f1a5c7b9e01
+                    device_id: 9a2f3b4c-5d6e-4f70-8123-456789abcdef
+                    key_id: b41c2d3e-4f50-4612-3789-abcdef012345
+                    key_prefix: sk-gw-abcd
+                    model_alias: fast
+                    upstream_model: deepseek-chat
+                    provider: DeepSeek
+                    provider_id: c0f1e2d3-4b5a-4968-8778-99aabbccddee
+                    is_stream: true
+                    fallback: false
+                    attempt_count: 1
+                    status_code: 200
+                    latency_ms: 1840
+                    ttft_ms: 420
+                    response_size: 15320
+                    error_code: null
+                    client_ip: 10.0.3.7
+                    user_agent: Claude-Code/1.2.3
+                    usage:
+                      input_tokens: 1200
+                      output_tokens: 640
+                      cost: '0.003120'
+                      currency: CNY
+                      latency_ms: 1840
+                      ttft_ms: 420
+                      is_stream: true
+                      fallback: false
+                      status: success
+                      http_status: 200
+                      error_code: null
+                      usage_source: upstream
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/audit:
+    get:
+      tags: [observability-admin]
+      operationId: listAuditLogs
+      summary: 管理操作审计列表（筛选 + 分页）
+      security:
+        - adminSession: []
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: actor_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: action
+          in: query
+          schema:
+            type: string
+            maxLength: 200
+        - name: resource_type
+          in: query
+          schema:
+            type: string
+            maxLength: 100
+        - name: outcome
+          in: query
+          schema:
+            type: string
+            enum: [success, failure, denied]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        '200':
+          description: 审计分页
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, limit, offset]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/requests/export:
+    get:
+      tags: [observability-admin]
+      operationId: exportRequestLogsCsv
+      summary: 导出请求日志 CSV（≤10 万行）
+      security:
+        - adminSession: []
+      responses:
+        '200':
+          description: text/csv 附件
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            text/csv:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/audit/export:
+    get:
+      tags: [observability-admin]
+      operationId: exportAuditLogsCsv
+      summary: 导出审计 CSV（≤10 万行，导出动作写审计）
+      security:
+        - adminSession: []
+      responses:
+        '200':
+          description: text/csv 附件
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            text/csv:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+
+components:
+  securitySchemes:
+    adminSession:
+      type: apiKey
+      in: cookie
+      name: gw_admin_session
+      description: identity 登录后下发的 HttpOnly Session Cookie
+  parameters:
+    RequestId:
+      name: request_id
+      in: path
+      required: true
+      description: 请求 ID（S4 为 UUID；允许 1–128 安全字符）
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: '^[A-Za-z0-9._:-]+$'
+    From:
+      name: from
+      in: query
+      required: false
+      description: 起始时间（含），RFC 3339；默认 now-24h
+      schema:
+        type: string
+        format: date-time
+    To:
+      name: to
+      in: query
+      required: false
+      description: 结束时间（不含），RFC 3339；默认 now；跨度 ≤31 天
+      schema:
+        type: string
+        format: date-time
+    UserIdFilter:
+      name: user_id
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+    DeviceIdFilter:
+      name: device_id
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+    KeyIdFilter:
+      name: key_id
+      in: query
+      required: false
+      schema:
+        type: string
+        format: uuid
+    KeyPrefixFilter:
+      name: key_prefix
+      in: query
+      required: false
+      description: Key 前缀精确匹配（如 sk-gw-abcd）
+      schema:
+        type: string
+        minLength: 4
+        maxLength: 32
+    ModelFilter:
+      name: model
+      in: query
+      required: false
+      description: 精确匹配 model_alias（含未解析成功的原始请求串）
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 100
+    ProviderFilter:
+      name: provider
+      in: query
+      required: false
+      description: 精确匹配供应商名快照
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 100
+    StatusClassFilter:
+      name: status_class
+      in: query
+      required: false
+      description: HTTP 状态类别；与 status_code 互斥
+      schema:
+        type: string
+        enum: [2xx, 3xx, 4xx, 5xx]
+    StatusCodeFilter:
+      name: status_code
+      in: query
+      required: false
+      description: 精确状态码；与 status_class 互斥
+      schema:
+        type: integer
+        minimum: 100
+        maximum: 599
+    TraceIdFilter:
+      name: trace_id
+      in: query
+      required: false
+      description: 同时匹配 trace_id 与 request_id（S4 两者同值）
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: '^[A-Za-z0-9._:-]+$'
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    Offset:
+      name: offset
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        maximum: 100000
+        default: 0
+  headers:
+    NoStore:
+      description: 日志查询结果不能被缓存
+      schema:
+        type: string
+        example: no-store
+    RequestId:
+      description: 请求 ID，与服务端日志关联
+      schema:
+        type: string
+        example: 0f8a5dd0-7d6f-4b7e-9f8e-2d0f5b7a6c11
+  responses:
+    BadRequest:
+      description: 参数/时间范围/状态过滤非法
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            validation_failed:
+              value:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: validation_failed
+                detail: 请求参数不合法
+                errors:
+                  limit: limit 必须在 1–200 之间
+            invalid_time_range:
+              value:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: invalid_time_range
+                detail: from 必须早于 to，且跨度不超过 31 天
+            invalid_status_filter:
+              value:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: invalid_status_filter
+                detail: status_class 只支持 2xx/3xx/4xx/5xx，且不能与 status_code 同时使用
+    NotAuthenticated:
+      description: 未登录/Session 过期
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            not_authenticated:
+              value:
+                type: about:blank
+                title: Unauthorized
+                status: 401
+                code: not_authenticated
+                detail: 请先登录
+    NotFound:
+      description: 请求记录不存在
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            request_not_found:
+              value:
+                type: about:blank
+                title: Not Found
+                status: 404
+                code: request_not_found
+                detail: 请求记录不存在
+    DatabaseUnavailable:
+      description: 数据库不可用
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            database_unavailable:
+              value:
+                type: about:blank
+                title: Service Unavailable
+                status: 503
+                code: database_unavailable
+                detail: 数据库暂不可用
+    InternalError:
+      description: 未预期错误（详情只进日志）
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            internal_error:
+              value:
+                type: about:blank
+                title: Internal Server Error
+                status: 500
+                code: internal_error
+                detail: 服务器内部错误，请稍后重试并提供 x-request-id
+  schemas:
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          default: about:blank
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          type: string
+        detail:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: string
+          description: 仅 400 validation_failed
+    RequestLogItem:
+      type: object
+      description: 请求日志元数据（绝不含正文/凭证/完整 Key）
+      required:
+        - id
+        - request_id
+        - trace_id
+        - created_at
+        - method
+        - path
+        - protocol
+        - upstream_protocol
+        - adapter
+        - user_id
+        - device_id
+        - key_id
+        - key_prefix
+        - model_alias
+        - upstream_model
+        - provider
+        - provider_id
+        - is_stream
+        - fallback
+        - attempt_count
+        - status_code
+        - latency_ms
+        - ttft_ms
+        - response_size
+        - error_code
+        - client_ip
+        - user_agent
+      properties:
+        id:
+          type: string
+          format: uuid
+        request_id:
+          type: string
+          maxLength: 128
+        trace_id:
+          type: [string, 'null']
+          maxLength: 128
+        created_at:
+          type: string
+          format: date-time
+        method:
+          type: string
+          maxLength: 16
+        path:
+          type: string
+          maxLength: 256
+          description: 路由模板，不含 query string
+        protocol:
+          type: string
+          enum: [chat_completions, messages, responses, gemini, models, other]
+        upstream_protocol:
+          type: [string, 'null']
+          maxLength: 32
+        adapter:
+          type: [string, 'null']
+          maxLength: 32
+          description: 适配器标识注册表（proxy 定义，如 chat_passthrough/messages_to_chat）
+        user_id:
+          type: [string, 'null']
+          format: uuid
+        device_id:
+          type: [string, 'null']
+          format: uuid
+        key_id:
+          type: [string, 'null']
+          format: uuid
+        key_prefix:
+          type: [string, 'null']
+          maxLength: 32
+        model_alias:
+          type: [string, 'null']
+          maxLength: 100
+        upstream_model:
+          type: [string, 'null']
+          maxLength: 200
+        provider:
+          type: [string, 'null']
+          maxLength: 200
+        provider_id:
+          type: [string, 'null']
+          format: uuid
+        is_stream:
+          type: boolean
+        fallback:
+          type: boolean
+        attempt_count:
+          type: integer
+          minimum: 1
+          maximum: 5
+        status_code:
+          type: [integer, 'null']
+          minimum: 100
+          maximum: 599
+        latency_ms:
+          type: integer
+          minimum: 0
+        ttft_ms:
+          type: [integer, 'null']
+          minimum: 0
+        response_size:
+          type: [integer, 'null']
+          minimum: 0
+        error_code:
+          type: [string, 'null']
+          maxLength: 64
+        client_ip:
+          type: [string, 'null']
+          maxLength: 64
+        user_agent:
+          type: string
+          maxLength: 512
+    UsageBlock:
+      type: object
+      description: 详情合并的计量块（metering 写入；非推理请求/不可用时为 null）
+      required:
+        - input_tokens
+        - output_tokens
+        - cost
+        - currency
+        - latency_ms
+        - ttft_ms
+        - is_stream
+        - fallback
+        - status
+        - http_status
+        - error_code
+        - usage_source
+      properties:
+        input_tokens:
+          type: integer
+          format: int64
+          minimum: 0
+        output_tokens:
+          type: integer
+          format: int64
+          minimum: 0
+        cost:
+          type: string
+          pattern: '^(0|[1-9][0-9]*)\.[0-9]{6}$'
+        currency:
+          type: string
+          enum: [CNY]
+        latency_ms:
+          type: integer
+          minimum: 0
+        ttft_ms:
+          type: [integer, 'null']
+          minimum: 0
+        is_stream:
+          type: boolean
+        fallback:
+          type: boolean
+        status:
+          type: string
+          enum: [success, upstream_error, timeout, gateway_error, client_disconnect, rejected]
+        http_status:
+          type: [integer, 'null']
+          minimum: 100
+          maximum: 599
+        error_code:
+          type: [string, 'null']
+          maxLength: 64
+        usage_source:
+          type: string
+          enum: [upstream, estimated, missing]
+    RequestLogPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RequestLogItem'
+        total:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 200
+        offset:
+          type: integer
+          minimum: 0
+    RequestLogDetail:
+      allOf:
+        - $ref: '#/components/schemas/RequestLogItem'
+        - type: object
+          required: [usage]
+          properties:
+            usage:
+              anyOf:
+                - $ref: '#/components/schemas/UsageBlock'
+                - type: 'null'

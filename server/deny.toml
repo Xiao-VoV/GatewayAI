@@ -1,0 +1,30 @@
+[licenses]
+# D16：只接受宽松许可证；拒绝 CPAL/AGPL UI 依赖。
+# CDLA-Permissive-2.0：webpki-roots（reqwest/rustls 的根证书数据）使用，
+# 属宽松数据许可证，与 MIT/Apache-2.0 同级的再分发许可。
+# Apache-2.0 WITH LLVM-exception：wasip2 / wit-bindgen 等 WASI 生态依赖使用，
+# 本质仍是 Apache-2.0，只是增加 LLVM 例外。
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Zlib",
+    "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.8
+
+[licenses.private]
+# 本仓库的应用 crate（publish = false，AGPL-3.0-only）忽略许可证检查：
+# 这里只约束第三方依赖的许可证。
+ignore = true
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+
+[advisories]
+ignore = []

@@ -1,0 +1,419 @@
+openapi: 3.1.0
+x-module: policy
+x-status: design-v0.1
+info:
+  title: AI Gateway - Policy Budget API
+  version: 0.1.0
+  description: |
+    用户日预算（管理台）契约。语义见同目录 接口设计.md / 技术设计.md。
+
+    约定：
+    - 管理台：identity `gw_admin_session` Cookie + `X-CSRF-Token`。
+    - 无客户端公开预算 API；`budget_exceeded` 429 由 S4 proxy 返回，不在本契约。
+    - 所有响应 `x-request-id` + `Cache-Control: no-store`。
+    - 金额为 CNY 十进制字符串（6 位小数）；0=不限额。
+servers:
+  - url: http://127.0.0.1:8080
+    description: 本地开发
+tags:
+  - name: policy-admin
+    description: 管理台用户日预算
+paths:
+  /api/admin/budgets:
+    get:
+      tags: [policy-admin]
+      operationId: listBudgets
+      summary: 已配置预算的用户列表（分页）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: 预算分页列表
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BudgetPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/budgets/{userId}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    get:
+      tags: [policy-admin]
+      operationId: getBudget
+      summary: 查询用户预算（未配置 404）
+      security:
+        - adminSession: []
+      responses:
+        '200':
+          description: 预算
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Budget'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    put:
+      tags: [policy-admin]
+      operationId: upsertBudget
+      summary: 设置/更新用户日预算（幂等 upsert）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertBudgetRequest'
+            examples:
+              fiveCny:
+                value:
+                  daily_limit: '5.000000'
+                  currency: CNY
+      responses:
+        '200':
+          description: 预算（upsert 后）
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Budget'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    delete:
+      tags: [policy-admin]
+      operationId: deleteBudget
+      summary: 删除预算（幂等，删除后不限额）
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: 已删除（不存在也返回 204）
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          $ref: '#/components/responses/CsrfInvalid'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+components:
+  securitySchemes:
+    adminSession:
+      type: apiKey
+      in: cookie
+      name: gw_admin_session
+      description: identity 登录后下发的 HttpOnly Session Cookie
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    Offset:
+      name: offset
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      description: identity 登录或 /me 返回的 CSRF token（43 字符）
+      schema:
+        type: string
+        minLength: 43
+        maxLength: 43
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  headers:
+    NoStore:
+      description: 预算数据不能被缓存
+      schema:
+        type: string
+        example: no-store
+    RequestId:
+      description: 请求 ID，与服务端日志关联
+      schema:
+        type: string
+        example: 0f8a5dd0-7d6f-4b7e-9f8e-2d0f5b7a6c11
+  responses:
+    BadRequest:
+      description: JSON/字段/币种校验失败
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ValidationProblem'
+          examples:
+            validation_failed:
+              value:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: validation_failed
+                detail: 请求参数不合法
+                errors:
+                  daily_limit: 金额格式不正确
+            unsupported_currency:
+              value:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: unsupported_currency
+                detail: S3 仅支持 CNY
+    NotAuthenticated:
+      description: 未登录/Session 过期
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            not_authenticated:
+              value:
+                type: about:blank
+                title: Unauthorized
+                status: 401
+                code: not_authenticated
+                detail: 请先登录
+    CsrfInvalid:
+      description: CSRF token 缺失或不正确
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            csrf_invalid:
+              value:
+                type: about:blank
+                title: Forbidden
+                status: 403
+                code: csrf_invalid
+                detail: CSRF token 不正确或已过期
+    NotFound:
+      description: 预算或用户不存在
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            budget_not_found:
+              value:
+                type: about:blank
+                title: Not Found
+                status: 404
+                code: budget_not_found
+                detail: 该用户未配置预算
+            user_not_found:
+              value:
+                type: about:blank
+                title: Not Found
+                status: 404
+                code: user_not_found
+                detail: 员工用户不存在
+    DatabaseUnavailable:
+      description: 数据库不可用
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            database_unavailable:
+              value:
+                type: about:blank
+                title: Service Unavailable
+                status: 503
+                code: database_unavailable
+                detail: 数据库暂不可用
+    InternalError:
+      description: 未预期错误（不返回内部细节）
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            internal_error:
+              value:
+                type: about:blank
+                title: Internal Server Error
+                status: 500
+                code: internal_error
+                detail: 服务器内部错误，请稍后重试并提供 x-request-id
+  schemas:
+    Budget:
+      type: object
+      required: [id, user_id, daily_limit, currency, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        daily_limit:
+          type: string
+          description: 日限额（CNY，6 位小数）；0=不限额
+          pattern: '^(0|[1-9]\d{0,11})\.\d{6}$'
+          examples: ['0.000000', '5.000000']
+        currency:
+          type: string
+          enum: [CNY]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    BudgetPage:
+      type: object
+      required: [items, total, limit, offset]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Budget'
+        total:
+          type: integer
+          minimum: 0
+        limit:
+          type: integer
+        offset:
+          type: integer
+    UpsertBudgetRequest:
+      type: object
+      additionalProperties: false
+      required: [daily_limit]
+      properties:
+        daily_limit:
+          type: string
+          description: 日限额（CNY）；0=不限额；最多 12 位整数+6 位小数
+          pattern: '^(0|[1-9]\d{0,11})(\.\d{1,6})?$'
+          examples: ['5', '5.00', '0']
+        currency:
+          type: string
+          enum: [CNY]
+          default: CNY
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          default: about:blank
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          type: string
+          description: 稳定错误码
+        detail:
+          type: string
+        errors:
+          type: object
+          additionalProperties:
+            type: string
+          description: 字段错误（仅 400 validation_failed）
+    ValidationProblem:
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          required: [errors]
+          properties:
+            errors:
+              type: object
+              additionalProperties:
+                type: string

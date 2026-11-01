@@ -1,0 +1,632 @@
+openapi: 3.1.0
+x-module: identity
+x-status: reviewed-v0.2
+info:
+  title: AI Gateway - Admin Identity API
+  version: 0.2.0
+  description: |
+    管理台身份模块（identity）API 契约。语义说明见同目录的 接口设计.md。
+
+    约定：
+    - 仅管理台使用；设备/代理数据面不走这里的 Cookie 鉴权。
+    - 业务错误统一 `application/problem+json`，带稳定 `code`。
+    - 所有响应带 `x-request-id` 与 `Cache-Control: no-store`。
+    - 登录成功后使用 HttpOnly Session Cookie；状态变更请求必须带 `X-CSRF-Token`。
+    - 未预期错误统一返回 `500 internal_error`，不返回 SQL/堆栈/内部路径。
+    - 响应不得返回密码哈希、Session token、CSRF 以外的敏感字段。
+servers:
+  - url: http://127.0.0.1:8080
+    description: 本地开发
+tags:
+  - name: identity
+    description: 管理台身份与会话
+paths:
+  /api/admin/auth/setup:
+    get:
+      tags: [identity]
+      operationId: getSetupStatus
+      summary: 查询是否需要初始化管理员
+      description: |
+        前端 `/setup` 页面用它判断是否显示初始化表单；空库返回 required=true。
+        `setup_token_required=true` 表示本实例配置了 `GW_SETUP_TOKEN`，提交时必须带 `X-Setup-Token`。
+        required=false 时页面应跳转 `/login`（US-001 的"再访问 /setup 返回 403"指 POST）。
+      responses:
+        '200':
+          description: 初始化状态
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SetupStatus'
+              examples:
+                fresh:
+                  value:
+                    required: true
+                    setup_token_required: false
+                fresh_with_token:
+                  value:
+                    required: true
+                    setup_token_required: true
+                initialized:
+                  value:
+                    required: false
+                    setup_token_required: false
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+    post:
+      tags: [identity]
+      operationId: setupAdmin
+      summary: 创建第一个管理员
+      description: |
+        仅在空库（admin_users 0 行）时允许；已有管理员返回 403。
+        创建成功不自动登录，前端跳转 `/login`（US-001）。
+        并发初始化用数据库事务 + advisory lock 保证只有一个成功。
+        setup token 缺失/错误的尝试按来源 IP 限流（15 分钟 5 次）。
+      parameters:
+        - $ref: '#/components/parameters/SetupToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetupRequest'
+            examples:
+              default:
+                value:
+                  email: admin@corp.example.com
+                  password: "change-me-please-123"
+                  display_name: 平台管理员
+      responses:
+        '201':
+          description: 管理员创建成功
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        '400':
+          $ref: '#/components/responses/ValidationProblemResponse'
+        '403':
+          description: 已初始化，或 setup token 不正确
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                already_initialized:
+                  value:
+                    type: about:blank
+                    title: Forbidden
+                    status: 403
+                    code: setup_already_completed
+                    detail: 系统已有管理员，不能再初始化
+                bad_setup_token:
+                  value:
+                    type: about:blank
+                    title: Forbidden
+                    status: 403
+                    code: setup_token_invalid
+                    detail: setup token 缺失或不正确
+        '409':
+          description: 并发初始化冲突
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                conflict:
+                  value:
+                    type: about:blank
+                    title: Conflict
+                    status: 409
+                    code: setup_conflict
+                    detail: 已存在管理员，请直接登录
+        '429':
+          $ref: '#/components/responses/TooManyAttempts'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/auth/login:
+    post:
+      tags: [identity]
+      operationId: login
+      summary: 管理员登录
+      description: |
+        校验邮箱/密码；失败统一返回 401 `invalid_credentials`，不区分账号不存在或密码错误。
+        成功后创建 Session，Set-Cookie `gw_admin_session`（HttpOnly/SameSite=Lax；生产加 Secure）。
+        返回 CSRF token，前端后续写请求放在 `X-CSRF-Token` 头。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            examples:
+              default:
+                value:
+                  email: admin@corp.example.com
+                  password: "change-me-please-123"
+      responses:
+        '200':
+          description: 登录成功
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Set-Cookie:
+              $ref: '#/components/headers/SessionCookie'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              examples:
+                success:
+                  value:
+                    user:
+                      id: 0f8a5dd0-7d6f-4b7e-9f8e-2d0f5b7a6c11
+                      email: admin@corp.example.com
+                      display_name: 平台管理员
+                      status: active
+                      created_at: "2026-10-29T01:30:00Z"
+                    csrf_token: "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8S9t0U1v"
+                    expires_at: "2026-10-29T13:30:00Z"
+        '400':
+          $ref: '#/components/responses/ValidationProblemResponse'
+        '401':
+          description: 凭证错误
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                invalid_credentials:
+                  value:
+                    type: about:blank
+                    title: Unauthorized
+                    status: 401
+                    code: invalid_credentials
+                    detail: 邮箱或密码错误
+        '403':
+          description: 账号被禁用（仅在密码正确后返回）
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                account_disabled:
+                  value:
+                    type: about:blank
+                    title: Forbidden
+                    status: 403
+                    code: account_disabled
+                    detail: 该管理员已被禁用
+        '429':
+          $ref: '#/components/responses/TooManyAttempts'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/auth/me:
+    get:
+      tags: [identity]
+      operationId: getCurrentAdmin
+      summary: 当前登录管理员与 CSRF token
+      description: 前端刷新页面后用它恢复登录态和 CSRF token。
+      security:
+        - adminSession: []
+      responses:
+        '200':
+          description: 当前会话
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/auth/logout:
+    post:
+      tags: [identity]
+      operationId: logout
+      summary: 退出当前会话
+      description: 删除服务端 Session，并 Set-Cookie 清除浏览器 Cookie。
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: 已退出
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Set-Cookie:
+              $ref: '#/components/headers/ClearSessionCookie'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          description: CSRF token 不正确
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                csrf_invalid:
+                  value:
+                    type: about:blank
+                    title: Forbidden
+                    status: 403
+                    code: csrf_invalid
+                    detail: CSRF token 不正确或已过期
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+  /api/admin/auth/password:
+    patch:
+      tags: [identity]
+      operationId: changePassword
+      summary: 修改当前管理员密码（吊销其他会话）
+      description: |
+        校验当前密码；更新 Argon2id hash 与 password_changed_at；删除该管理员除当前会话外的全部 Session。
+        当前会话继续有效，其他会话下一次请求 401；请求/审计不记录密码。
+      security:
+        - adminSession: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [current_password, new_password]
+              properties:
+                current_password:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+                new_password:
+                  type: string
+                  minLength: 10
+                  maxLength: 128
+      responses:
+        '204':
+          description: 修改成功（无响应体）
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+        '400':
+          $ref: '#/components/responses/ValidationProblemResponse'
+        '401':
+          $ref: '#/components/responses/NotAuthenticated'
+        '403':
+          description: CSRF token 不正确
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+              examples:
+                csrf_invalid:
+                  value:
+                    type: about:blank
+                    title: Forbidden
+                    status: 403
+                    code: csrf_invalid
+                    detail: CSRF token 不正确或已过期
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/DatabaseUnavailable'
+
+components:
+  securitySchemes:
+    adminSession:
+      type: apiKey
+      in: cookie
+      name: gw_admin_session
+      description: 登录成功后下发的 HttpOnly Session Cookie
+  parameters:
+    SetupToken:
+      name: X-Setup-Token
+      in: header
+      required: false
+      description: 服务端配置 GW_SETUP_TOKEN 时必填；未配置时忽略
+      schema:
+        type: string
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      description: 登录接口或 /me 返回的 CSRF token（32 字节 base64url，43 字符）
+      schema:
+        type: string
+        minLength: 43
+        maxLength: 43
+  headers:
+    NoStore:
+      description: 身份响应不能被缓存
+      schema:
+        type: string
+        example: no-store
+    RequestId:
+      description: 请求 ID，与服务端日志关联
+      schema:
+        type: string
+        example: 0f8a5dd0-7d6f-4b7e-9f8e-2d0f5b7a6c11
+    SessionCookie:
+      description: HttpOnly 会话 Cookie；固定 Max-Age=43200（12h，D18）；生产环境必须加 Secure
+      schema:
+        type: string
+        example: gw_admin_session=opaque-token; Path=/; HttpOnly; SameSite=Lax; Max-Age=43200
+    ClearSessionCookie:
+      description: 清除会话 Cookie（属性与下发时一致，额外 Max-Age=0）
+      schema:
+        type: string
+        example: gw_admin_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0
+  responses:
+    ValidationProblemResponse:
+      description: 请求参数校验失败（errors 为字段名 → 可读错误）
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ValidationProblem'
+          examples:
+            invalid_email:
+              value:
+                type: about:blank
+                title: Bad Request
+                status: 400
+                code: validation_failed
+                detail: 请求参数不合法
+                errors:
+                  email: 邮箱格式不正确
+    NotAuthenticated:
+      description: 未登录或会话已过期
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            not_authenticated:
+              value:
+                type: about:blank
+                title: Unauthorized
+                status: 401
+                code: not_authenticated
+                detail: 请先登录
+    TooManyAttempts:
+      description: 认证尝试过于频繁（登录失败 / setup token 错误）
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+        Retry-After:
+          description: 建议等待秒数（剩余窗口，最小 60）
+          schema:
+            type: integer
+            minimum: 60
+          example: 60
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            too_many_attempts:
+              value:
+                type: about:blank
+                title: Too Many Requests
+                status: 429
+                code: too_many_attempts
+                detail: 尝试过于频繁，请稍后再试
+    DatabaseUnavailable:
+      description: 数据库不可用
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            database_unavailable:
+              value:
+                type: about:blank
+                title: Service Unavailable
+                status: 503
+                code: database_unavailable
+                detail: 数据库暂不可用
+    InternalError:
+      description: 未预期错误（不返回内部细节）
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          examples:
+            internal_error:
+              value:
+                type: about:blank
+                title: Internal Server Error
+                status: 500
+                code: internal_error
+                detail: 服务器内部错误，请稍后重试并提供 x-request-id
+  schemas:
+    SetupStatus:
+      type: object
+      required: [required, setup_token_required]
+      properties:
+        required:
+          type: boolean
+          description: true 表示还没有管理员，需要初始化；false 时前端跳转 /login
+        setup_token_required:
+          type: boolean
+          description: true 表示本实例配置了 GW_SETUP_TOKEN，提交时必须带 X-Setup-Token
+    SetupRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          minLength: 10
+          maxLength: 128
+          description: 至少 10 个字符；不设复杂度硬规则
+        display_name:
+          type: string
+          maxLength: 64
+          default: ""
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          minLength: 1
+          maxLength: 128
+    AdminUser:
+      type: object
+      required: [id, email, display_name, status, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        display_name:
+          type: string
+        status:
+          type: string
+          enum: [active, disabled]
+        created_at:
+          type: string
+          format: date-time
+    LoginResponse:
+      type: object
+      required: [user, csrf_token, expires_at]
+      properties:
+        user:
+          $ref: '#/components/schemas/AdminUser'
+        csrf_token:
+          type: string
+          description: 写请求放在 X-CSRF-Token；32 字节 base64url（43 字符）
+          minLength: 43
+          maxLength: 43
+        expires_at:
+          type: string
+          format: date-time
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          default: about:blank
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+        code:
+          type: string
+          description: 稳定错误码，前端按它处理
+        errors:
+          type: object
+          additionalProperties:
+            type: string
+          description: 字段名 → 可读错误（仅 400 validation_failed）
+    ValidationProblem:
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          properties:
+            errors:
+              type: object
+              additionalProperties:
+                type: string
+              description: 字段名 → 可读错误
