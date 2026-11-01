@@ -50,7 +50,8 @@ async function requestJson<T>(serverUrl: string, path: string, options: RequestO
   const headers = new Headers({ Accept: 'application/json' })
   if (options.body !== undefined) headers.set('Content-Type', 'application/json')
   if (options.token) headers.set('Authorization', `Bearer ${options.token}`)
-  if (options.apiKey) headers.set('Authorization', options.apiKey)
+  // 网关数据面只接受 `Authorization: Bearer <key>` / `x-api-key: <key>`；裸 Authorization 会被视为未提供。
+  if (options.apiKey) headers.set('x-api-key', options.apiKey)
   if (options.deviceToken) headers.set('X-GW-Device-Token', options.deviceToken)
 
   const method = options.method ?? 'GET'
