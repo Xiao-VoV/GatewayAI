@@ -19,6 +19,10 @@
     "typecheck": "pnpm -r typecheck",
     "server:dev": "cargo run --manifest-path server/Cargo.toml",
     "check:admin": "pnpm --filter @gw/admin typecheck && pnpm --filter @gw/admin build",
-    "check:client": "pnpm --filter @gw/client typecheck && pnpm --filter @gw/client build"
+    "check:client": "pnpm --filter @gw/client typecheck && pnpm --filter @gw/client build",
+    "dev:up": "bash scripts/dev-start.sh start",
+    "dev:down": "bash scripts/dev-start.sh stop",
+    "dev:status": "bash scripts/dev-start.sh status",
+    "dev:logs": "bash scripts/dev-start.sh logs"
   }
 }
