@@ -12,7 +12,7 @@ aes-gcm = "0.10"
 anyhow = "1"
 argon2 = "0.5"
 axum = "0.8"
-base64 = "0.22"
+base64 = "0.23"
 bytes = "1"
 chrono = { version = "0.4", features = ["serde"] }
 dotenvy = "0.15"
