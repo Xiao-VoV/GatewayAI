@@ -8,7 +8,7 @@ repository = "https://github.com/Xiao-VoV/GatewayAI"
 publish = false
 
 [dependencies]
-aes-gcm = "0.10"
+aes-gcm = "0.11"
 anyhow = "1"
 argon2 = "0.5"
 axum = "0.8"
