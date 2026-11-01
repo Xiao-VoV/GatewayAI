@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex" />
     <title>gw client · AI Gateway</title>
+    <script>
+      try {
+        const saved = JSON.parse(localStorage.getItem('gw-client-ui-v1') || '{}')
+        const dark = saved.theme === 'dark' || (saved.theme !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+        if (saved.locale) document.documentElement.lang = saved.locale
+      } catch {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

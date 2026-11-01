@@ -5,6 +5,7 @@ import { isDesktopRuntime } from '../platform/secureStore'
 import { localRouterStatus } from '../platform/nativeRouter'
 import { nativeHttpRequest } from '../platform/nativeHttp'
 import { Badge, PageHead } from '../components/ui'
+import { useUiPreferences } from '../ui/preferences'
 
 interface CheckResult {
   id: string
@@ -56,6 +57,8 @@ async function probe(url: string): Promise<{ ok: boolean; status: number; latenc
 
 export function RecoveryPage() {
   const client = useClient()
+  const { locale } = useUiPreferences()
+  const en = locale === 'en-US'
   const navigate = useNavigate()
   const [checks, setChecks] = useState<CheckResult[]>([])
   const [running, setRunning] = useState(false)
@@ -68,40 +71,40 @@ export function RecoveryPage() {
     setCopied(false)
     const results: CheckResult[] = []
     const health = await probe(`${client.session.serverUrl}/healthz`)
-    results.push({ id: 'health', label: '网关 healthz', ok: health.ok, detail: health.detail, latencyMs: health.latencyMs })
+    results.push({ id: 'health', label: en ? 'Gateway healthz' : '网关 healthz', ok: health.ok, detail: health.detail, latencyMs: health.latencyMs })
     const ready = await probe(`${client.session.serverUrl}/readyz`)
-    results.push({ id: 'ready', label: '网关 readyz（DB）', ok: ready.ok, detail: ready.detail, latencyMs: ready.latencyMs })
+    results.push({ id: 'ready', label: en ? 'Gateway readyz (DB)' : '网关 readyz（DB）', ok: ready.ok, detail: ready.detail, latencyMs: ready.latencyMs })
     if (isDesktopRuntime()) {
       try {
         const router = await localRouterStatus()
         results.push({
           id: 'router',
-          label: '本地路由',
+          label: en ? 'Local router' : '本地路由',
           ok: router.running,
-          detail: router.running ? `${router.baseUrl}（127.0.0.1:${router.port}）` : (client.routerError ?? '未运行'),
+          detail: router.running ? `${router.baseUrl} (127.0.0.1:${router.port})` : (client.routerError ?? (en ? 'stopped' : '未运行')),
         })
       } catch (error) {
         results.push({
           id: 'router',
-          label: '本地路由',
+          label: en ? 'Local router' : '本地路由',
           ok: false,
-          detail: error instanceof Error ? error.message : '状态读取失败',
+          detail: error instanceof Error ? error.message : en ? 'Failed to read status' : '状态读取失败',
         })
       }
     } else {
-      results.push({ id: 'router', label: '本地路由', ok: false, detail: '浏览器预览不支持（需 Tauri 桌面版）' })
+      results.push({ id: 'router', label: en ? 'Local router' : '本地路由', ok: false, detail: en ? 'Not available in browser preview (requires desktop app)' : '浏览器预览不支持（需 Tauri 桌面版）' })
     }
     results.push({
       id: 'catalog',
-      label: '模型目录同步',
+      label: en ? 'Catalog sync' : '模型目录同步',
       ok: client.snapshot !== null,
       detail: client.snapshot
-        ? `${client.snapshot.models.length} 个模型 · ${new Date(client.snapshot.syncedAt).toLocaleTimeString('zh-CN')}`
-        : '尚未同步',
+        ? `${client.snapshot.models.length} ${en ? 'models' : '个模型'} · ${new Date(client.snapshot.syncedAt).toLocaleTimeString(locale)}`
+        : en ? 'Not synced yet' : '尚未同步',
     })
     setChecks(results)
     setRunning(false)
-  }, [client])
+  }, [client, en, locale])
 
   useEffect(() => {
     void run()
@@ -128,7 +131,7 @@ export function RecoveryPage() {
       '',
       ...checks.map((check) => `${check.ok ? 'OK' : 'FAIL'} ${check.label}: ${check.detail}${check.latencyMs !== undefined ? ` (${check.latencyMs}ms)` : ''}`),
       '',
-      '不含 Key/token/对话内容',
+      en ? 'Contains no keys, tokens or conversation content' : '不含 Key/token/对话内容',
     ]
     try {
       await navigator.clipboard.writeText(lines.join('\n'))
@@ -148,17 +151,17 @@ export function RecoveryPage() {
   return (
     <>
       <PageHead
-        title="诊断与恢复"
-        desc="检查网关、本地路由与目录同步；诊断信息不包含 Key、token 或对话内容。"
+        title={en ? 'Diagnostics' : '诊断与恢复'}
+        desc={en ? 'Check the gateway, local router and catalog sync. Diagnostics never include keys, tokens or conversation content.' : '检查网关、本地路由与目录同步；诊断信息不包含 Key、token 或对话内容。'}
         actions={
           <button className="btn" type="button" onClick={() => void run()} disabled={running}>
-            {running ? '检测中…' : '重新检测'}
+            {running ? (en ? 'Checking…' : '检测中…') : en ? 'Run checks' : '重新检测'}
           </button>
         }
       />
 
       <div className={`note ${failed > 0 ? 'warn' : ''}`}>
-        {running ? '正在检查…' : failed === 0 ? '所有检查通过' : `${failed} 项检查失败`}
+        {running ? (en ? 'Running checks…' : '正在检查…') : failed === 0 ? (en ? 'All checks passed' : '所有检查通过') : en ? `${failed} check(s) failed` : `${failed} 项检查失败`}
       </div>
 
       <div className="card">
@@ -166,10 +169,10 @@ export function RecoveryPage() {
           <table className="table dense">
             <thead>
               <tr>
-                <th>检查</th>
-                <th>状态</th>
-                <th>详情</th>
-                <th>耗时</th>
+                <th>{en ? 'Check' : '检查'}</th>
+                <th>{en ? 'Status' : '状态'}</th>
+                <th>{en ? 'Details' : '详情'}</th>
+                <th>{en ? 'Latency' : '耗时'}</th>
               </tr>
             </thead>
             <tbody>
@@ -177,7 +180,7 @@ export function RecoveryPage() {
                 <tr key={check.id}>
                   <td>{check.label}</td>
                   <td>
-                    <Badge tone={check.ok ? 'ok' : 'bad'}>{check.ok ? '通过' : '失败'}</Badge>
+                    <Badge tone={check.ok ? 'ok' : 'bad'}>{check.ok ? (en ? 'OK' : '通过') : en ? 'Failed' : '失败'}</Badge>
                   </td>
                   <td style={{ wordBreak: 'break-all' }}>{check.detail}</td>
                   <td className="num">{check.latencyMs !== undefined ? `${check.latencyMs}ms` : '—'}</td>
@@ -186,7 +189,7 @@ export function RecoveryPage() {
               {checks.length === 0 && (
                 <tr>
                   <td colSpan={4} className="hint">
-                    尚未运行检查。
+                    {en ? 'No checks have run yet.' : '尚未运行检查。'}
                   </td>
                 </tr>
               )}
@@ -195,45 +198,45 @@ export function RecoveryPage() {
         </div>
         <div className="row" style={{ marginTop: 12, flexWrap: 'wrap' }}>
           <button className="btn" type="button" onClick={() => void handleRestartRouter()} disabled={running || !isDesktopRuntime()}>
-            重启本地路由
+            {en ? 'Restart local router' : '重启本地路由'}
           </button>
           <button className="btn" type="button" onClick={() => void handleCopy()} disabled={checks.length === 0}>
-            {copied ? '已复制' : '复制诊断信息'}
+            {copied ? (en ? 'Copied' : '已复制') : en ? 'Copy diagnostics' : '复制诊断信息'}
           </button>
           <button className="btn" type="button" onClick={() => navigate('/settings')}>
-            连接设置
+            {en ? 'Connection settings' : '连接设置'}
           </button>
         </div>
       </div>
 
       <div className="card">
-        <h3>恢复建议</h3>
+        <h3>{en ? 'Recovery suggestions' : '恢复建议'}</h3>
         <ul className="hint" style={{ margin: '8px 0 0', paddingLeft: 18 }}>
-          <li>healthz 失败：确认网关地址、VPN/网络与证书。</li>
-          <li>readyz 失败：服务端数据库不可用，联系管理员。</li>
-          <li>本地路由失败：点击重启；仍失败时重新配对或检查端口权限。</li>
-          <li>目录为空：管理员尚未发布模型，或本组/用户不可见。</li>
+          <li>{en ? 'healthz failed: verify the gateway URL, VPN/network and certificates.' : 'healthz 失败：确认网关地址、VPN/网络与证书。'}</li>
+          <li>{en ? 'readyz failed: the server database is unavailable; contact an administrator.' : 'readyz 失败：服务端数据库不可用，联系管理员。'}</li>
+          <li>{en ? 'Local router failed: restart it; if it still fails, re-pair or check port permissions.' : '本地路由失败：点击重启；仍失败时重新配对或检查端口权限。'}</li>
+          <li>{en ? 'Empty catalog: no models published yet, or not visible to your group/user.' : '目录为空：管理员尚未发布模型，或本组/用户不可见。'}</li>
         </ul>
       </div>
 
       <div className="card">
-        <h3>清除本机配对</h3>
+        <h3>{en ? 'Remove this pairing' : '清除本机配对'}</h3>
         <p className="sub" style={{ marginTop: 4 }}>
-          清除后需管理员重新生成配对码；诊断信息仍可复制。
+          {en ? 'A new pairing code from an administrator is required. Diagnostics can still be copied.' : '清除后需管理员重新生成配对码；诊断信息仍可复制。'}
         </p>
         {confirmForget ? (
           <div className="row" style={{ marginTop: 10 }}>
-            <span className="hint">确定清除本机配对？</span>
+            <span className="hint">{en ? 'Remove this pairing?' : '确定清除本机配对？'}</span>
             <button className="btn danger" type="button" onClick={handleForget}>
-              确认清除
+              {en ? 'Remove' : '确认清除'}
             </button>
             <button className="btn" type="button" onClick={() => setConfirmForget(false)}>
-              取消
+              {en ? 'Cancel' : '取消'}
             </button>
           </div>
         ) : (
           <button className="btn danger" type="button" onClick={() => setConfirmForget(true)} style={{ marginTop: 10 }}>
-            清除本机配对
+            {en ? 'Remove pairing' : '清除本机配对'}
           </button>
         )}
       </div>

@@ -62,8 +62,14 @@ export function detectPlatform(): string {
   return 'unknown'
 }
 
-function defaultDeviceName(): string {
+function defaultDeviceName(locale: 'zh-CN' | 'en-US' = 'zh-CN'): string {
   const platform = detectPlatform()
+  if (locale === 'en-US') {
+    if (platform === 'macos') return 'My Mac'
+    if (platform === 'windows') return 'My Windows PC'
+    if (platform === 'linux') return 'My Linux PC'
+    return 'My Computer'
+  }
   if (platform === 'macos') return '我的 Mac'
   if (platform === 'windows') return '我的 Windows 电脑'
   if (platform === 'linux') return '我的 Linux 电脑'

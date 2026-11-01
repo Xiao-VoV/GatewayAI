@@ -1,6 +1,8 @@
 # @gw/client — AI Gateway 客户端
 
-独立客户端应用（React 19 + Vite + TypeScript），只通过 HTTP 调用 `server/`，**不导入服务端代码**。
+独立客户端应用（React 19 + Vite + TypeScript + Tauri），只通过 HTTP 调用 `server/`，**不导入服务端代码**。
+
+桌面 UI 使用 Tauri 原生窗口作为唯一外壳（不渲染线框式假窗口/假 titlebar）。视觉按桌面应用设计：浅色侧栏 + 图标导航、渐变首页 hero、onboarding 全窗口分栏；设置支持跟随系统/浅色/深色主题与中文/English 切换（本地持久化）。
 
 当前切片实现真实设备配对与目录同步：
 
