@@ -33,7 +33,7 @@ export function LoginPage() {
     setFormError(null)
     setFieldErrors({})
     if (!email.trim() || !password) {
-      setFormError(tr('请输入邮箱和密码', 'Enter your email and password'))
+      setFormError(tr("enter_your_email_and_password"))
       return
     }
     setSubmitting(true)
@@ -45,18 +45,18 @@ export function LoginPage() {
         setFieldErrors(error.errors)
         if (error.status === 429) {
           const wait = error.retryAfterSeconds
-            ? tr(`，请 ${error.retryAfterSeconds} 秒后重试`, `. Try again in ${error.retryAfterSeconds} seconds.`)
-            : tr('，请稍后重试', '. Try again later.')
-          setFormError(`${tr('登录尝试过于频繁', 'Too many sign-in attempts')}${wait}`)
+            ? tr("try_again_in_seconds", { retryAfterSeconds: error.retryAfterSeconds })
+            : tr("try_again_later")
+          setFormError(`${tr("too_many_sign_in_attempts")}${wait}`)
         } else if (error.status === 401) {
-          setFormError(tr('邮箱或密码不正确', 'Incorrect email or password'))
+          setFormError(tr("incorrect_email_or_password"))
         } else if (error.status === 403) {
           setFormError(error.detail)
         } else {
           setFormError(error.detail)
         }
       } else {
-        setFormError(tr('登录失败，请重试', 'Sign-in failed. Try again.'))
+        setFormError(tr("sign_in_failed_try_again"))
       }
     } finally {
       setSubmitting(false)
@@ -69,15 +69,15 @@ export function LoginPage() {
         <div className="login-locale"><LocaleSwitch /></div>
         <img className="login-logo" src="/logo.svg" alt="Orveil" />
         <h1>Orveil Console</h1>
-        <p>{tr('企业 AI 网关控制台 · 管理员登录', 'Enterprise AI Gateway · Administrator sign-in')}</p>
+        <p>{tr("enterprise_ai_gateway_administrator_sign_in")}</p>
         {state?.created && (
           <div className="note" style={{ marginBottom: 14 }}>
-            {tr('管理员已创建，请登录。', 'Administrator created. Please sign in.')}
+            {tr("administrator_created_please_sign_in")}
           </div>
         )}
         <form className="grid" onSubmit={(event) => void handleSubmit(event)} noValidate>
           <div className="field">
-            <label htmlFor="login-email">{tr('邮箱', 'Email')}</label>
+            <label htmlFor="login-email">{tr("email")}</label>
             <input
               id="login-email"
               className="input"
@@ -90,7 +90,7 @@ export function LoginPage() {
             {fieldErrors.email && <span className="field-error">{fieldErrors.email}</span>}
           </div>
           <div className="field">
-            <label htmlFor="login-password">{tr('密码', 'Password')}</label>
+            <label htmlFor="login-password">{tr("password")}</label>
             <input
               id="login-password"
               className="input"
@@ -107,13 +107,10 @@ export function LoginPage() {
             </div>
           )}
           <button className="btn primary" type="submit" disabled={submitting}>
-            {submitting ? tr('登录中…', 'Signing in…') : tr('登录', 'Sign in')}
+            {submitting ? tr("signing_in") : tr("sign_in")}
           </button>
           <span className="hint">
-            {tr(
-              'Cookie Session + CSRF；登录失败不会透露账号是否存在。',
-              'Cookie session + CSRF; failed sign-ins never reveal whether an account exists.',
-            )}
+            {tr("cookie_session_csrf_failed_sign_ins_never_reveal_whether")}
           </span>
         </form>
       </div>

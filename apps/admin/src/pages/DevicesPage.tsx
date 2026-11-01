@@ -15,6 +15,7 @@ import { Badge, PageHead } from '../components/ui'
 import { ConfirmDialog, Modal } from '../components/Modal'
 import { EmptyPanel, ErrorPanel, LoadingPanel } from '../components/ScreenState'
 import { useI18n } from '../i18n/I18nProvider'
+import type { Translate } from '../i18n/translate'
 
 type Tab = 'devices' | 'pairing'
 
@@ -31,11 +32,11 @@ interface PairingDraft {
 
 const emptyPairing: PairingDraft = { user_email: '', user_display_name: '', ttl: '600' }
 
-function pairingStatusBadge(status: string, tr: (zh: string, en: string) => string) {
-  if (status === 'active') return <Badge tone="ok">{tr('未使用', 'Unused')}</Badge>
-  if (status === 'used') return <Badge>{tr('已使用', 'Used')}</Badge>
-  if (status === 'expired') return <Badge tone="warn">{tr('已过期', 'Expired')}</Badge>
-  return <Badge tone="warn">{tr('已作废', 'Revoked')}</Badge>
+function pairingStatusBadge(status: string, tr: Translate) {
+  if (status === 'active') return <Badge tone="ok">{tr("unused")}</Badge>
+  if (status === 'used') return <Badge>{tr("used")}</Badge>
+  if (status === 'expired') return <Badge tone="warn">{tr("expired")}</Badge>
+  return <Badge tone="warn">{tr("revoked")}</Badge>
 }
 
 export function DevicesPage() {
@@ -82,7 +83,7 @@ export function DevicesPage() {
       setDeviceEdit(null)
       reload()
     } catch (err) {
-      handleError(err, tr('更新设备失败', 'Failed to update device'))
+      handleError(err, tr("failed_to_update_device"))
     } finally {
       setBusy(null)
     }
@@ -97,7 +98,7 @@ export function DevicesPage() {
       setUnbindTarget(null)
       reload()
     } catch (err) {
-      handleError(err, tr('解绑设备失败', 'Failed to unbind device'))
+      handleError(err, tr("failed_to_unbind_device"))
     } finally {
       setBusy(null)
     }
@@ -123,7 +124,7 @@ export function DevicesPage() {
         setPairingErrors(err.errors)
         setActionError(err.detail)
       } else {
-        setActionError(tr('创建配对码失败', 'Failed to create pairing code'))
+        setActionError(tr("failed_to_create_pairing_code"))
       }
     } finally {
       setBusy(null)
@@ -139,7 +140,7 @@ export function DevicesPage() {
       setInvalidateTarget(null)
       reload()
     } catch (err) {
-      handleError(err, tr('作废配对码失败', 'Failed to revoke pairing code'))
+      handleError(err, tr("failed_to_revoke_pairing_code"))
     } finally {
       setBusy(null)
     }
@@ -150,18 +151,15 @@ export function DevicesPage() {
 
   const refresh = (
     <button className="btn" type="button" onClick={reload} disabled={loading}>
-      {loading ? tr('刷新中…', 'Refreshing…') : tr('刷新', 'Refresh')}
+      {loading ? tr("refreshing") : tr("refresh")}
     </button>
   )
 
   return (
     <>
       <PageHead
-        title={tr('设备与配对', 'Devices & pairing')}
-        desc={tr(
-          '设备绑定用户与 Key；配对码用于客户端首次注册。',
-          'Devices bind users to keys; pairing codes handle first-time client registration.',
-        )}
+        title={tr("devices_pairing")}
+        desc={tr("devices_bind_users_to_keys_pairing_codes_handle_first_ti")}
         actions={
           <>
             {refresh}
@@ -175,7 +173,7 @@ export function DevicesPage() {
                 setPairingOpen(true)
               }}
             >
-              {tr('生成配对码', 'Generate pairing code')}
+              {tr("generate_pairing_code")}
             </button>
           </>
         }
@@ -183,10 +181,10 @@ export function DevicesPage() {
 
       <div className="tabs">
         <button className={tab === 'devices' ? 'active' : ''} type="button" onClick={() => setTab('devices')}>
-          {tr(`设备（${deviceCount}）`, `Devices (${deviceCount})`)}
+          {tr("devices", { deviceCount: deviceCount })}
         </button>
         <button className={tab === 'pairing' ? 'active' : ''} type="button" onClick={() => setTab('pairing')}>
-          {tr(`配对码（${pairingCodeCount}）`, `Pairing codes (${pairingCodeCount})`)}
+          {tr("pairing_codes", { pairingCodeCount: pairingCodeCount })}
         </button>
       </div>
 
@@ -197,20 +195,17 @@ export function DevicesPage() {
       )}
 
       {loading && !data ? (
-        <LoadingPanel title={tr('正在读取设备与配对码…', 'Loading devices and pairing codes…')} />
+        <LoadingPanel title={tr("loading_devices_and_pairing_codes")} />
       ) : error ? (
         <ErrorPanel error={error} onRetry={reload} />
       ) : tab === 'devices' ? (
         !data || data.devices.length === 0 ? (
           <EmptyPanel
-            title={tr('还没有设备', 'No devices yet')}
-            desc={tr(
-              '生成配对码发给员工，客户端首次配对后会创建用户/设备/虚拟 Key。',
-              'Generate a pairing code for an employee; the first client pairing creates the user, device, and virtual key.',
-            )}
+            title={tr("no_devices_yet")}
+            desc={tr("generate_a_pairing_code_for_an_employee_the_first_client")}
             action={
               <button className="btn primary" type="button" onClick={() => setPairingOpen(true)}>
-                {tr('生成配对码', 'Generate pairing code')}
+                {tr("generate_pairing_code")}
               </button>
             }
           />
@@ -219,16 +214,16 @@ export function DevicesPage() {
             <div className="card">
               <div className="toolbar">
                 <div className="field" style={{ width: 160 }}>
-                  <label htmlFor="device-status">{tr('状态', 'Status')}</label>
+                  <label htmlFor="device-status">{tr("status")}</label>
                   <select
                     id="device-status"
                     className="select"
                     value={statusFilter}
                     onChange={(event) => setStatusFilter(event.target.value)}
                   >
-                    <option value="">{tr('全部', 'All')}</option>
-                    <option value="active">{tr('正常', 'Active')}</option>
-                    <option value="disabled">{tr('已禁用', 'Disabled')}</option>
+                    <option value="">{tr("all")}</option>
+                    <option value="active">{tr("active")}</option>
+                    <option value="disabled">{tr("disabled_2")}</option>
                   </select>
                 </div>
               </div>
@@ -237,13 +232,13 @@ export function DevicesPage() {
               <table className="table dense">
                 <thead>
                   <tr>
-                    <th>{tr('设备', 'Device')}</th>
-                    <th>{tr('用户', 'User')}</th>
-                    <th>{tr('平台 / 版本', 'Platform / version')}</th>
-                    <th>{tr('状态', 'Status')}</th>
+                    <th>{tr("device")}</th>
+                    <th>{tr("user")}</th>
+                    <th>{tr("platform_version")}</th>
+                    <th>{tr("status")}</th>
                     <th>Key</th>
-                    <th>{tr('最近在线', 'Last seen')}</th>
-                    <th className="cell-actions">{tr('操作', 'Actions')}</th>
+                    <th>{tr("last_seen")}</th>
+                    <th className="cell-actions">{tr("actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -265,9 +260,9 @@ export function DevicesPage() {
                         <Badge tone={device.status === 'active' ? 'ok' : 'bad'}>
                           {device.status === 'active'
                             ? device.online
-                              ? tr('在线', 'Online')
-                              : tr('正常', 'Active')
-                            : tr('已禁用', 'Disabled')}
+                              ? tr("online")
+                              : tr("active")
+                            : tr("disabled_2")}
                         </Badge>
                       </td>
                       <td>{device.key ? <code className="kbd">{device.key.key_prefix}</code> : '—'}</td>
@@ -275,10 +270,10 @@ export function DevicesPage() {
                       <td className="cell-actions">
                         <span className="row-actions">
                           <button className="btn sm" type="button" onClick={() => openEditDevice(device)}>
-                            {tr('编辑', 'Edit')}
+                            {tr("edit")}
                           </button>
                           <button className="btn sm danger" type="button" onClick={() => setUnbindTarget(device)}>
-                            {tr('解绑', 'Unbind')}
+                            {tr("unbind")}
                           </button>
                         </span>
                       </td>
@@ -291,19 +286,19 @@ export function DevicesPage() {
         )
       ) : !data || data.codes.length === 0 ? (
         <EmptyPanel
-          title={tr('还没有配对码', 'No pairing codes yet')}
-          desc={tr('配对码一次性使用，默认 10 分钟过期。', 'Pairing codes are single-use and expire after 10 minutes by default.')}
+          title={tr("no_pairing_codes_yet")}
+          desc={tr("pairing_codes_are_single_use_and_expire_after_10_minutes")}
         />
       ) : (
         <div className="table-wrap">
           <table className="table dense">
             <thead>
               <tr>
-                <th>{tr('用户', 'User')}</th>
-                <th>{tr('状态', 'Status')}</th>
-                <th>{tr('过期', 'Expires')}</th>
-                <th>{tr('创建', 'Created')}</th>
-                <th className="cell-actions">{tr('操作', 'Actions')}</th>
+                <th>{tr("user")}</th>
+                <th>{tr("status")}</th>
+                <th>{tr("expires")}</th>
+                <th>{tr("created")}</th>
+                <th className="cell-actions">{tr("actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -323,7 +318,7 @@ export function DevicesPage() {
                       disabled={code.status !== 'active'}
                       onClick={() => setInvalidateTarget(code)}
                     >
-                      {tr('作废', 'Revoke')}
+                      {tr("revoke")}
                     </button>
                   </td>
                 </tr>
@@ -331,33 +326,30 @@ export function DevicesPage() {
             </tbody>
           </table>
           <div className="hint" style={{ padding: '8px 12px' }}>
-            {tr(
-              '列表不回显配对码明文；新码只在生成时显示一次。',
-              'Pairing codes are not shown in the list; a new code is displayed only once.',
-            )}
+            {tr("pairing_codes_are_not_shown_in_the_list_a_new_code_is_di")}
           </div>
         </div>
       )}
 
       {deviceEdit && (
         <Modal
-          title={tr('编辑设备', 'Edit device')}
+          title={tr("edit_device")}
           sub={`${deviceEdit.user.email} · ${deviceEdit.platform}`}
           onClose={() => setDeviceEdit(null)}
           footer={
             <>
               <button className="btn" type="button" onClick={() => setDeviceEdit(null)} disabled={busy !== null}>
-                {tr('取消', 'Cancel')}
+                {tr("cancel")}
               </button>
               <button className="btn primary" type="submit" form="edit-device-form" disabled={busy !== null}>
-                {busy === 'device-save' ? tr('保存中…', 'Saving…') : tr('保存', 'Save')}
+                {busy === 'device-save' ? tr("saving") : tr("save")}
               </button>
             </>
           }
         >
           <form id="edit-device-form" className="grid" onSubmit={(event) => void handleSaveDevice(event)} noValidate>
             <div className="field">
-              <label htmlFor="device-name">{tr('设备名', 'Device name')}</label>
+              <label htmlFor="device-name">{tr("device_name")}</label>
               <input
                 id="device-name"
                 className="input"
@@ -366,7 +358,7 @@ export function DevicesPage() {
               />
             </div>
             <div className="field">
-              <label htmlFor="device-edit-status">{tr('状态', 'Status')}</label>
+              <label htmlFor="device-edit-status">{tr("status")}</label>
               <select
                 id="device-edit-status"
                 className="select"
@@ -375,8 +367,8 @@ export function DevicesPage() {
                   setDeviceDraft({ ...deviceDraft, status: event.target.value as DeviceDraft['status'] })
                 }
               >
-                <option value="active">{tr('正常', 'Active')}</option>
-                <option value="disabled">{tr('禁用', 'Disabled')}</option>
+                <option value="active">{tr("active")}</option>
+                <option value="disabled">{tr("disabled")}</option>
               </select>
             </div>
             {actionError && (
@@ -390,16 +382,13 @@ export function DevicesPage() {
 
       {unbindTarget && (
         <ConfirmDialog
-          title={tr(`解绑设备 ${unbindTarget.name}？`, `Unbind device ${unbindTarget.name}?`)}
+          title={tr("unbind_device", { name: unbindTarget.name })}
           desc={
             <p>
-              {tr(
-                '解绑后该设备 token/Key 失效，需重新配对；操作写入审计。',
-                'The device token/key becomes invalid after unbinding and re-pairing is required; this action is written to the audit log.',
-              )}
+              {tr("the_device_token_key_becomes_invalid_after_unbinding_and")}
             </p>
           }
-          confirmText={tr('解绑', 'Unbind')}
+          confirmText={tr("unbind")}
           danger
           busy={busy === 'device-unbind'}
           onCancel={() => setUnbindTarget(null)}
@@ -409,23 +398,23 @@ export function DevicesPage() {
 
       {pairingOpen && (
         <Modal
-          title={tr('生成配对码', 'Generate pairing code')}
-          sub={tr('客户端用服务器地址 + 配对码完成注册', 'Clients register with the server address and pairing code')}
+          title={tr("generate_pairing_code")}
+          sub={tr("clients_register_with_the_server_address_and_pairing_cod")}
           onClose={() => setPairingOpen(false)}
           footer={
             <>
               <button className="btn" type="button" onClick={() => setPairingOpen(false)} disabled={busy !== null}>
-                {tr('取消', 'Cancel')}
+                {tr("cancel")}
               </button>
               <button className="btn primary" type="submit" form="pairing-form" disabled={busy !== null}>
-                {busy === 'pairing-create' ? tr('生成中…', 'Generating…') : tr('生成', 'Generate')}
+                {busy === 'pairing-create' ? tr("generating") : tr("generate")}
               </button>
             </>
           }
         >
           <form id="pairing-form" className="grid" onSubmit={(event) => void handleCreatePairing(event)} noValidate>
             <div className="field">
-              <label htmlFor="pairing-email">{tr('员工邮箱', 'Employee email')}</label>
+              <label htmlFor="pairing-email">{tr("employee_email")}</label>
               <input
                 id="pairing-email"
                 className="input"
@@ -437,7 +426,7 @@ export function DevicesPage() {
               {pairingErrors.user_email && <span className="field-error">{pairingErrors.user_email}</span>}
             </div>
             <div className="field">
-              <label htmlFor="pairing-name">{tr('显示名（可选）', 'Display name (optional)')}</label>
+              <label htmlFor="pairing-name">{tr("display_name_optional")}</label>
               <input
                 id="pairing-name"
                 className="input"
@@ -446,7 +435,7 @@ export function DevicesPage() {
               />
             </div>
             <div className="field">
-              <label htmlFor="pairing-ttl">{tr('有效期（秒）', 'TTL (seconds)')}</label>
+              <label htmlFor="pairing-ttl">{tr("ttl_seconds")}</label>
               <input
                 id="pairing-ttl"
                 className="input"
@@ -470,9 +459,9 @@ export function DevicesPage() {
 
       {invalidateTarget && (
         <ConfirmDialog
-          title={tr('作废配对码？', 'Revoke pairing code?')}
-          desc={<p>{tr('未使用的配对码立即失效；已使用的记录保留。', 'Unused pairing codes become invalid immediately; used records are kept.')}</p>}
-          confirmText={tr('作废', 'Revoke')}
+          title={tr("revoke_pairing_code")}
+          desc={<p>{tr("unused_pairing_codes_become_invalid_immediately_used_rec")}</p>}
+          confirmText={tr("revoke")}
           danger
           busy={busy === 'pairing-invalidate'}
           onCancel={() => setInvalidateTarget(null)}
@@ -482,25 +471,25 @@ export function DevicesPage() {
 
       {createdCode && (
         <Modal
-          title={tr('配对码已生成', 'Pairing code generated')}
-          sub={tr('仅显示一次；请通过安全渠道发给员工', 'Shown only once; share it with the employee via a secure channel')}
+          title={tr("pairing_code_generated")}
+          sub={tr("shown_only_once_share_it_with_the_employee_via_a_secure")}
           onClose={() => setCreatedCode(null)}
           footer={
             <button className="btn primary" type="button" onClick={() => setCreatedCode(null)}>
-              {tr('关闭', 'Close')}
+              {tr("close")}
             </button>
           }
         >
           <div className="field">
-            <label>{tr('配对码', 'Pairing code')}</label>
+            <label>{tr("pairing_code")}</label>
             <div className="row">
               <input className="input" readOnly value={createdCode.code} style={{ fontFamily: 'var(--mono)' }} />
               <button className="btn" type="button" onClick={() => void navigator.clipboard?.writeText(createdCode.code)}>
-                {tr('复制', 'Copy')}
+                {tr("copy")}
               </button>
             </div>
             <span className="hint">
-              {createdCode.user.email} · {tr('有效期至', 'Valid until')}{' '}
+              {createdCode.user.email} · {tr("valid_until")}{' '}
               {new Date(createdCode.expires_at).toLocaleString('zh-CN')}
             </span>
           </div>

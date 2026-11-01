@@ -19,57 +19,57 @@ export function AdminShell() {
 
   const groups = [
     {
-      title: tr('运营', 'Operations'),
+      title: tr("operations"),
       items: [
-        { to: '/', label: tr('总览', 'Overview'), end: true },
-        { to: '/logs', label: tr('请求日志', 'Request logs') },
-        { to: '/audit', label: tr('审计', 'Audit') },
+        { to: '/', label: tr("overview"), end: true },
+        { to: '/logs', label: tr("request_logs") },
+        { to: '/audit', label: tr("audit") },
       ],
     },
     {
-      title: tr('资源', 'Resources'),
+      title: tr("resources"),
       items: [
-        { to: '/providers', label: tr('供应商', 'Providers') },
-        { to: '/models', label: tr('模型目录', 'Model catalog') },
-        { to: '/tool-defaults', label: tr('工具默认', 'Tool defaults') },
-        { to: '/catalog-preview', label: tr('员工目录预览', 'Employee catalog') },
-        { to: '/keys', label: tr('虚拟 Key', 'Virtual keys') },
-        { to: '/devices', label: tr('设备与配对', 'Devices & pairing') },
-        { to: '/groups', label: tr('用户与用户组', 'Users & groups') },
+        { to: '/providers', label: tr("providers") },
+        { to: '/models', label: tr("model_catalog") },
+        { to: '/tool-defaults', label: tr("tool_defaults") },
+        { to: '/catalog-preview', label: tr("employee_catalog") },
+        { to: '/keys', label: tr("virtual_keys") },
+        { to: '/devices', label: tr("devices_pairing") },
+        { to: '/groups', label: tr("users_groups") },
       ],
     },
     {
-      title: tr('系统', 'System'),
+      title: tr("system"),
       items: [
-        { to: '/settings', label: tr('设置', 'Settings') },
-        { to: '/account', label: tr('账号与会话', 'Account & session') },
+        { to: '/settings', label: tr("settings") },
+        { to: '/account', label: tr("account_session") },
       ],
     },
   ]
 
   const titles: Record<string, string> = {
-    '/': tr('总览', 'Overview'),
-    '/providers': tr('供应商', 'Providers'),
-    '/models': tr('模型目录', 'Model catalog'),
-    '/tool-defaults': tr('工具默认', 'Tool defaults'),
-    '/catalog-preview': tr('员工目录预览', 'Employee catalog'),
-    '/keys': tr('虚拟 Key', 'Virtual keys'),
-    '/devices': tr('设备与配对', 'Devices & pairing'),
-    '/groups': tr('用户与用户组', 'Users & groups'),
-    '/logs': tr('请求日志', 'Request logs'),
-    '/audit': tr('审计', 'Audit'),
-    '/settings': tr('设置', 'Settings'),
-    '/account': tr('账号与会话', 'Account & session'),
+    '/': tr("overview"),
+    '/providers': tr("providers"),
+    '/models': tr("model_catalog"),
+    '/tool-defaults': tr("tool_defaults"),
+    '/catalog-preview': tr("employee_catalog"),
+    '/keys': tr("virtual_keys"),
+    '/devices': tr("devices_pairing"),
+    '/groups': tr("users_groups"),
+    '/logs': tr("request_logs"),
+    '/audit': tr("audit"),
+    '/settings': tr("settings"),
+    '/account': tr("account_session"),
   }
 
   function titleFor(path: string) {
-    if (path.startsWith('/providers/')) return tr('供应商详情', 'Provider detail')
-    if (path.startsWith('/models/')) return tr('模型组详情', 'Model group detail')
-    return titles[path] ?? tr('管理台', 'Console')
+    if (path.startsWith('/providers/')) return tr("provider_detail")
+    if (path.startsWith('/models/')) return tr("model_group_detail")
+    return titles[path] ?? tr("console")
   }
 
   const user = session?.user
-  const displayName = user?.display_name || user?.email || tr('管理员', 'Administrator')
+  const displayName = user?.display_name || user?.email || tr("administrator")
 
   async function handleLogout() {
     setLoggingOut(true)
@@ -87,7 +87,7 @@ export function AdminShell() {
         <div className="brand">
           <img className="logo" src="/mark-cream.svg" alt="Orveil" />
           <span>
-            Orveil Console<small>{tr('企业 AI 网关控制台', 'Enterprise AI Gateway')}</small>
+            Orveil Console<small>{tr("enterprise_ai_gateway")}</small>
           </span>
         </div>
         {groups.map((group) => (
@@ -115,12 +115,12 @@ export function AdminShell() {
       <div className="main">
         <header className="topbar">
           <h1>{titleFor(pathname)}</h1>
-          <span className="crumb">{tr('管理台', 'Console')} / {titleFor(pathname)}</span>
+          <span className="crumb">{tr("console")} / {titleFor(pathname)}</span>
           <div className="topbar-right">
             <LocaleSwitch />
             <div className="topbar-user">
               <span className="avatar" aria-hidden="true">
-                {initials(displayName, tr('管', 'A'))}
+                {initials(displayName, tr("a"))}
               </span>
               <div className="who">
                 <div>{displayName}</div>
@@ -128,7 +128,7 @@ export function AdminShell() {
               </div>
             </div>
             <button className="btn sm" type="button" onClick={() => void handleLogout()} disabled={loggingOut}>
-              {loggingOut ? tr('退出中…', 'Signing out…') : tr('退出', 'Sign out')}
+              {loggingOut ? tr("signing_out") : tr("sign_out")}
             </button>
           </div>
         </header>

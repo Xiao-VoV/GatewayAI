@@ -9,8 +9,7 @@ import { Badge, PageHead } from '../components/ui'
 import { ErrorPanel, LoadingPanel, EmptyPanel } from '../components/ScreenState'
 import { Modal } from '../components/Modal'
 import { useI18n } from '../i18n/I18nProvider'
-
-type Translate = (zh: string, en: string) => string
+import type { Translate } from '../i18n/translate'
 
 interface ProviderDraft {
   name: string
@@ -30,7 +29,7 @@ function makeEmptyDraft(tr: Translate): ProviderDraft {
     name: '',
     base_url: '',
     description: '',
-    accountName: tr('主账号', 'Main account'),
+    accountName: tr("main_account"),
     apiKey: '',
     region: '',
     weight: 100,
@@ -60,8 +59,8 @@ function toInput(draft: ProviderDraft): CreateProviderInput {
 
 function StatusBadge({ provider }: { provider: Provider }) {
   const { tr } = useI18n()
-  if (provider.status === 'active') return <Badge tone="ok">{tr('启用', 'Enabled')}</Badge>
-  return <Badge>{tr('已禁用', 'Disabled')}</Badge>
+  if (provider.status === 'active') return <Badge tone="ok">{tr("enabled")}</Badge>
+  return <Badge>{tr("disabled_2")}</Badge>
 }
 
 export function ProvidersPage() {
@@ -101,7 +100,7 @@ export function ProvidersPage() {
         setFieldErrors(err.errors)
         setFormError(err.detail)
       } else {
-        setFormError(tr('保存失败，请重试', 'Save failed. Please try again.'))
+        setFormError(tr("save_failed_please_try_again"))
       }
     } finally {
       setSaving(false)
@@ -114,7 +113,7 @@ export function ProvidersPage() {
       const result = await testProvider(provider.id)
       setTestResults((prev) => ({ ...prev, [provider.id]: result }))
     } catch (err) {
-      const message = err instanceof ApiError ? err.detail : tr('测试请求失败', 'Test request failed')
+      const message = err instanceof ApiError ? err.detail : tr("test_request_failed")
       setTestResults((prev) => ({
         ...prev,
         [provider.id]: {
@@ -133,23 +132,20 @@ export function ProvidersPage() {
 
   const refresh = (
     <button className="btn" type="button" onClick={reload} disabled={loading}>
-      {loading ? tr('刷新中…', 'Refreshing…') : tr('刷新', 'Refresh')}
+      {loading ? tr("refreshing") : tr("refresh")}
     </button>
   )
 
   return (
     <>
       <PageHead
-        title={tr('供应商', 'Providers')}
-        desc={tr(
-          '上游服务与渠道账号；保存前测试连通性。',
-          'Upstream services and channel accounts. Test connectivity before saving.',
-        )}
+        title={tr("providers")}
+        desc={tr("upstream_services_and_channel_accounts_test_connectivity")}
         actions={
           <>
             {refresh}
             <button className="btn primary" type="button" onClick={openCreate}>
-              {tr('添加供应商', 'Add provider')}
+              {tr("add_provider")}
             </button>
           </>
         }
@@ -158,45 +154,39 @@ export function ProvidersPage() {
       <div className="card">
         <div className="toolbar">
           <div className="field" style={{ width: 180 }}>
-            <label htmlFor="provider-status">{tr('状态', 'Status')}</label>
+            <label htmlFor="provider-status">{tr("status")}</label>
             <select
               id="provider-status"
               className="select"
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
             >
-              <option value="">{tr('全部', 'All')}</option>
-              <option value="active">{tr('启用', 'Enabled')}</option>
-              <option value="disabled">{tr('已禁用', 'Disabled')}</option>
+              <option value="">{tr("all")}</option>
+              <option value="active">{tr("enabled")}</option>
+              <option value="disabled">{tr("disabled_2")}</option>
             </select>
           </div>
           <span className="hint" style={{ marginTop: 18 }}>
-            {tr(
-              '仅支持 OpenAI 兼容渠道；凭证加密存储，仅显示后四位。',
-              'OpenAI-compatible channels only. Credentials are encrypted; only the last four characters are shown.',
-            )}
+            {tr("openai_compatible_channels_only_credentials_are_encrypte")}
           </span>
         </div>
       </div>
 
       {loading && !data ? (
-        <LoadingPanel title={tr('正在读取供应商…', 'Loading providers…')} />
+        <LoadingPanel title={tr("loading_providers")} />
       ) : error ? (
         <ErrorPanel error={error} onRetry={reload} />
       ) : !data || data.items.length === 0 ? (
         <EmptyPanel
           title={
             statusFilter
-              ? tr('没有匹配的供应商', 'No matching providers')
-              : tr('还没有供应商', 'No providers yet')
+              ? tr("no_matching_providers")
+              : tr("no_providers_yet")
           }
-          desc={tr(
-            '添加 OpenAI 兼容供应商与第一个渠道账号；之后可以测试连通性、添加上游模型。',
-            'Add an OpenAI-compatible provider and its first account; then test connectivity and add upstream models.',
-          )}
+          desc={tr("add_an_openai_compatible_provider_and_its_first_account")}
           action={
             <button className="btn primary" type="button" onClick={openCreate}>
-              {tr('添加供应商', 'Add provider')}
+              {tr("add_provider")}
             </button>
           }
         />
@@ -205,13 +195,13 @@ export function ProvidersPage() {
           <table className="table dense">
             <thead>
               <tr>
-                <th>{tr('名称', 'Name')}</th>
-                <th>{tr('类型', 'Type')}</th>
+                <th>{tr("name")}</th>
+                <th>{tr("type")}</th>
                 <th>Base URL</th>
-                <th>{tr('描述', 'Description')}</th>
-                <th>{tr('状态', 'Status')}</th>
-                <th>{tr('最近测试', 'Last test')}</th>
-                <th className="cell-actions">{tr('操作', 'Actions')}</th>
+                <th>{tr("description")}</th>
+                <th>{tr("status")}</th>
+                <th>{tr("last_test")}</th>
+                <th className="cell-actions">{tr("actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -235,13 +225,13 @@ export function ProvidersPage() {
                       {result ? (
                         result.ok ? (
                           <Badge tone="ok">
-                            {tr('成功', 'Passed')} · {result.latency_ms}ms
+                            {tr("passed")} · {result.latency_ms}ms
                           </Badge>
                         ) : (
-                          <Badge tone="bad">{result.error?.code ?? tr('失败', 'Failed')}</Badge>
+                          <Badge tone="bad">{result.error?.code ?? tr("failed")}</Badge>
                         )
                       ) : (
-                        <span className="hint">{tr('未测试', 'Not tested')}</span>
+                        <span className="hint">{tr("not_tested")}</span>
                       )}
                     </td>
                     <td className="cell-actions">
@@ -255,7 +245,7 @@ export function ProvidersPage() {
                             void handleTest(provider)
                           }}
                         >
-                          {testingId === provider.id ? tr('测试中…', 'Testing…') : tr('测试', 'Test')}
+                          {testingId === provider.id ? tr("testing") : tr("test")}
                         </button>
                         <button
                           className="btn sm"
@@ -265,7 +255,7 @@ export function ProvidersPage() {
                             navigate(`/providers/${provider.id}`)
                           }}
                         >
-                          {tr('详情', 'Details')}
+                          {tr("details")}
                         </button>
                       </span>
                     </td>
@@ -275,27 +265,24 @@ export function ProvidersPage() {
             </tbody>
           </table>
           <div className="hint" style={{ padding: '8px 12px' }}>
-            {`${tr('共', 'Total:')} ${data.total} ${tr('个供应商', 'providers')}`}
+            {`${tr("total")} ${data.total} ${tr("providers_2")}`}
           </div>
         </div>
       )}
 
       {modalOpen && (
         <Modal
-          title={tr('添加供应商', 'Add provider')}
-          sub={tr(
-            'OpenAI 兼容渠道；创建时同时保存第一个账号',
-            'OpenAI-compatible channel; the first account is saved with it',
-          )}
+          title={tr("add_provider")}
+          sub={tr("openai_compatible_channel_the_first_account_is_saved_wit")}
           onClose={() => setModalOpen(false)}
           wide
           footer={
             <>
               <button className="btn" type="button" onClick={() => setModalOpen(false)} disabled={saving}>
-                {tr('取消', 'Cancel')}
+                {tr("cancel")}
               </button>
               <button className="btn primary" type="submit" form="create-provider-form" disabled={saving}>
-                {saving ? tr('保存中…', 'Saving…') : tr('保存供应商', 'Save provider')}
+                {saving ? tr("saving") : tr("save_provider")}
               </button>
             </>
           }
@@ -303,19 +290,19 @@ export function ProvidersPage() {
           <form id="create-provider-form" className="grid" onSubmit={(event) => void handleCreate(event)} noValidate>
             <div className="grid cols-2">
               <div className="field">
-                <label htmlFor="provider-name">{tr('名称', 'Name')}</label>
+                <label htmlFor="provider-name">{tr("name")}</label>
                 <input
                   id="provider-name"
                   className="input"
-                  placeholder={tr('例如 DeepSeek', 'e.g. DeepSeek')}
+                  placeholder={tr("e_g_deepseek")}
                   value={draft.name}
                   onChange={(event) => setDraft({ ...draft, name: event.target.value })}
                 />
                 {fieldErrors.name && <span className="field-error">{fieldErrors.name}</span>}
               </div>
               <div className="field">
-                <label>{tr('类型', 'Type')}</label>
-                <input className="input" value={tr('OpenAI 兼容', 'OpenAI compatible')} disabled />
+                <label>{tr("type")}</label>
+                <input className="input" value={tr("openai_compatible")} disabled />
               </div>
             </div>
             <div className="field">
@@ -330,11 +317,11 @@ export function ProvidersPage() {
               {fieldErrors.base_url && <span className="field-error">{fieldErrors.base_url}</span>}
             </div>
             <div className="field">
-              <label htmlFor="provider-description">{tr('描述', 'Description')}</label>
+              <label htmlFor="provider-description">{tr("description")}</label>
               <input
                 id="provider-description"
                 className="input"
-                placeholder={tr('可选，例如 官方直连 / 云服务', 'Optional, e.g. direct / cloud')}
+                placeholder={tr("optional_e_g_direct_cloud")}
                 value={draft.description}
                 onChange={(event) => setDraft({ ...draft, description: event.target.value })}
               />
@@ -342,7 +329,7 @@ export function ProvidersPage() {
             </div>
             <div className="grid cols-2">
               <div className="field">
-                <label htmlFor="account-name">{tr('账号名', 'Account name')}</label>
+                <label htmlFor="account-name">{tr("account_name")}</label>
                 <input
                   id="account-name"
                   className="input"
@@ -352,11 +339,11 @@ export function ProvidersPage() {
                 {fieldErrors['account.name'] && <span className="field-error">{fieldErrors['account.name']}</span>}
               </div>
               <div className="field">
-                <label htmlFor="account-region">{tr('区域', 'Region')}</label>
+                <label htmlFor="account-region">{tr("region")}</label>
                 <input
                   id="account-region"
                   className="input"
-                  placeholder={tr('可选，例如 华东-上海 / us-east-1', 'Optional, e.g. cn-east-1 / us-east-1')}
+                  placeholder={tr("optional_e_g_cn_east_1_us_east_1")}
                   value={draft.region}
                   onChange={(event) => setDraft({ ...draft, region: event.target.value })}
                 />
@@ -376,15 +363,12 @@ export function ProvidersPage() {
               />
               {fieldErrors['account.api_key'] && <span className="field-error">{fieldErrors['account.api_key']}</span>}
               <span className="hint">
-                {tr(
-                  '加密存储；保存后只显示提示，不返回明文。',
-                  'Stored encrypted. Only a hint is returned after saving; the plaintext key is never exposed.',
-                )}
+                {tr("stored_encrypted_only_a_hint_is_returned_after_saving_th")}
               </span>
             </div>
             <div className="grid cols-4">
               <div className="field">
-                <label htmlFor="account-weight">{tr('权重 %', 'Weight %')}</label>
+                <label htmlFor="account-weight">{tr("weight")}</label>
                 <input
                   id="account-weight"
                   className="input"
@@ -396,7 +380,7 @@ export function ProvidersPage() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="account-priority">{tr('优先级', 'Priority')}</label>
+                <label htmlFor="account-priority">{tr("priority")}</label>
                 <input
                   id="account-priority"
                   className="input"
@@ -408,23 +392,23 @@ export function ProvidersPage() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="account-rpm">{tr('RPM 上限', 'RPM limit')}</label>
+                <label htmlFor="account-rpm">{tr("rpm_limit")}</label>
                 <input
                   id="account-rpm"
                   className="input"
                   type="number"
-                  placeholder={tr('可选', 'Optional')}
+                  placeholder={tr("optional")}
                   value={draft.rpmLimit}
                   onChange={(event) => setDraft({ ...draft, rpmLimit: event.target.value })}
                 />
               </div>
               <div className="field">
-                <label htmlFor="account-tpm">{tr('TPM 上限', 'TPM limit')}</label>
+                <label htmlFor="account-tpm">{tr("tpm_limit")}</label>
                 <input
                   id="account-tpm"
                   className="input"
                   type="number"
-                  placeholder={tr('可选', 'Optional')}
+                  placeholder={tr("optional")}
                   value={draft.tpmLimit}
                   onChange={(event) => setDraft({ ...draft, tpmLimit: event.target.value })}
                 />

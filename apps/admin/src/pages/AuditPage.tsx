@@ -83,7 +83,7 @@ export function AuditPage() {
           ? err.detail
           : err instanceof Error
             ? err.message
-            : tr('导出失败', 'Export failed'),
+            : tr("export_failed"),
       )
     }
   }
@@ -91,18 +91,15 @@ export function AuditPage() {
   return (
     <>
       <PageHead
-        title={tr('审计', 'Audit')}
-        desc={tr(
-          '管理员写操作审计；事件只追加，不含 headers/正文/凭证。',
-          'Administrator write-action audit trail. Events are append-only and contain no headers, bodies, or credentials.',
-        )}
+        title={tr("audit")}
+        desc={tr("administrator_write_action_audit_trail_events_are_append")}
         actions={
           <>
             <button className="btn" type="button" onClick={reload} disabled={loading}>
-              {loading ? tr('刷新中…', 'Refreshing…') : tr('刷新', 'Refresh')}
+              {loading ? tr("refreshing") : tr("refresh")}
             </button>
             <button className="btn" type="button" onClick={() => void handleExport()}>
-              {tr('导出 CSV', 'Export CSV')}
+              {tr("export_csv")}
             </button>
           </>
         }
@@ -112,7 +109,7 @@ export function AuditPage() {
         <form className="grid" onSubmit={applyFilters}>
           <div className="grid cols-4">
             <div className="field">
-              <label htmlFor="audit-from">{tr('开始时间', 'Start time')}</label>
+              <label htmlFor="audit-from">{tr("start_time")}</label>
               <input
                 id="audit-from"
                 className="input"
@@ -122,7 +119,7 @@ export function AuditPage() {
               />
             </div>
             <div className="field">
-              <label htmlFor="audit-to">{tr('结束时间', 'End time')}</label>
+              <label htmlFor="audit-to">{tr("end_time")}</label>
               <input
                 id="audit-to"
                 className="input"
@@ -132,21 +129,21 @@ export function AuditPage() {
               />
             </div>
             <div className="field">
-              <label htmlFor="audit-outcome">{tr('结果', 'Outcome')}</label>
+              <label htmlFor="audit-outcome">{tr("outcome")}</label>
               <select
                 id="audit-outcome"
                 className="select"
                 value={draft.outcome}
                 onChange={(event) => setDraft({ ...draft, outcome: event.target.value })}
               >
-                <option value="">{tr('全部', 'All')}</option>
+                <option value="">{tr("all")}</option>
                 <option value="success">success</option>
                 <option value="failure">failure</option>
                 <option value="denied">denied</option>
               </select>
             </div>
             <div className="field">
-              <label htmlFor="audit-action">{tr('动作', 'Action')}</label>
+              <label htmlFor="audit-action">{tr("action")}</label>
               <input
                 id="audit-action"
                 className="input"
@@ -158,7 +155,7 @@ export function AuditPage() {
           </div>
           <div className="grid cols-2">
             <div className="field">
-              <label htmlFor="audit-resource-type">{tr('资源类型', 'Resource type')}</label>
+              <label htmlFor="audit-resource-type">{tr("resource_type")}</label>
               <input
                 id="audit-resource-type"
                 className="input"
@@ -168,7 +165,7 @@ export function AuditPage() {
               />
             </div>
             <div className="field">
-              <label htmlFor="audit-resource-id">{tr('资源 ID', 'Resource ID')}</label>
+              <label htmlFor="audit-resource-id">{tr("resource_id")}</label>
               <input
                 id="audit-resource-id"
                 className="input"
@@ -179,7 +176,7 @@ export function AuditPage() {
           </div>
           <div className="row">
             <button className="btn primary" type="submit">
-              {tr('查询', 'Search')}
+              {tr("search")}
             </button>
             <button
               className="btn"
@@ -189,13 +186,10 @@ export function AuditPage() {
                 setFilters(emptyFilters)
               }}
             >
-              {tr('重置', 'Reset')}
+              {tr("reset")}
             </button>
             <span className="hint">
-              {tr(
-                '默认最近 7 天、最新 100 条；结果成败也记录 denied。',
-                'Defaults to the last 7 days, latest 100 events; outcomes include success, failure, and denied.',
-              )}
+              {tr("defaults_to_the_last_7_days_latest_100_events_outcomes_i")}
             </span>
           </div>
         </form>
@@ -208,27 +202,24 @@ export function AuditPage() {
       )}
 
       {loading && !data ? (
-        <LoadingPanel title={tr('正在读取审计…', 'Loading audit events…')} />
+        <LoadingPanel title={tr("loading_audit_events")} />
       ) : error ? (
         <ErrorPanel error={error} onRetry={reload} />
       ) : !data || data.items.length === 0 ? (
         <EmptyPanel
-          title={tr('没有匹配的审计事件', 'No matching audit events')}
-          desc={tr(
-            '管理员写操作会记录；调整筛选或时间范围。',
-            'Administrator write actions are recorded here. Adjust the filters or time range.',
-          )}
+          title={tr("no_matching_audit_events")}
+          desc={tr("administrator_write_actions_are_recorded_here_adjust_the")}
         />
       ) : (
         <div className="table-wrap">
           <table className="table dense">
             <thead>
               <tr>
-                <th>{tr('时间', 'Time')}</th>
-                <th>{tr('操作者', 'Actor')}</th>
-                <th>{tr('动作', 'Action')}</th>
-                <th>{tr('资源', 'Resource')}</th>
-                <th>{tr('结果', 'Outcome')}</th>
+                <th>{tr("time")}</th>
+                <th>{tr("actor")}</th>
+                <th>{tr("action")}</th>
+                <th>{tr("resource")}</th>
+                <th>{tr("outcome")}</th>
                 <th>IP</th>
                 <th></th>
               </tr>
@@ -252,7 +243,7 @@ export function AuditPage() {
                   <td>{item.client_ip ?? '—'}</td>
                   <td>
                     <button className="btn sm" type="button" onClick={() => setDetail(item)}>
-                      {tr('详情', 'Details')}
+                      {tr("details")}
                     </button>
                   </td>
                 </tr>
@@ -260,36 +251,33 @@ export function AuditPage() {
             </tbody>
           </table>
           <div className="hint" style={{ padding: '8px 12px' }}>
-            {tr(
-              `共 ${data.total} 条；detail 已脱敏。`,
-              `Total: ${data.total} events; detail is redacted.`,
-            )}
+            {tr("total_events_detail_is_redacted", { total: data.total })}
           </div>
         </div>
       )}
 
       {detail && (
-        <Modal title={tr('审计详情', 'Audit details')} onClose={() => setDetail(null)} wide>
+        <Modal title={tr("audit_details")} onClose={() => setDetail(null)} wide>
           <dl className="kv">
-            <dt>{tr('事件 ID', 'Event ID')}</dt>
+            <dt>{tr("event_id")}</dt>
             <dd>
               <code className="kbd">{detail.id}</code>
             </dd>
-            <dt>{tr('时间', 'Time')}</dt>
+            <dt>{tr("time")}</dt>
             <dd>{new Date(detail.created_at).toLocaleString('zh-CN')}</dd>
-            <dt>{tr('操作者', 'Actor')}</dt>
+            <dt>{tr("actor")}</dt>
             <dd>
               {detail.actor_email ?? '—'} · {detail.actor_type} · {detail.actor_id ?? '—'}
             </dd>
-            <dt>{tr('动作', 'Action')}</dt>
+            <dt>{tr("action")}</dt>
             <dd>
               <code className="kbd">{detail.action}</code>
             </dd>
-            <dt>{tr('资源', 'Resource')}</dt>
+            <dt>{tr("resource")}</dt>
             <dd>
               {detail.resource_type} / {detail.resource_id ?? '—'}
             </dd>
-            <dt>{tr('结果', 'Outcome')}</dt>
+            <dt>{tr("outcome")}</dt>
             <dd>{detail.outcome}</dd>
             <dt>request_id</dt>
             <dd>{detail.request_id ?? '—'}</dd>

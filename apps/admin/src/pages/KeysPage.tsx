@@ -8,6 +8,7 @@ import { Badge, PageHead } from '../components/ui'
 import { ConfirmDialog, Modal } from '../components/Modal'
 import { EmptyPanel, ErrorPanel, LoadingPanel } from '../components/ScreenState'
 import { useI18n } from '../i18n/I18nProvider'
+import type { Translate } from '../i18n/translate'
 
 interface KeyDraft {
   allowed_models: string
@@ -26,10 +27,10 @@ function fromDatetimeLocal(value: string) {
   return value ? new Date(value).toISOString() : null
 }
 
-function statusBadge(status: string, tr: (zh: string, en: string) => string) {
-  if (status === 'active') return <Badge tone="ok">{tr('启用', 'Active')}</Badge>
-  if (status === 'paused') return <Badge tone="warn">{tr('暂停', 'Paused')}</Badge>
-  return <Badge tone="bad">{tr('已吊销', 'Revoked')}</Badge>
+function statusBadge(status: string, tr: Translate) {
+  if (status === 'active') return <Badge tone="ok">{tr("active_2")}</Badge>
+  if (status === 'paused') return <Badge tone="warn">{tr("paused")}</Badge>
+  return <Badge tone="bad">{tr("revoked_2")}</Badge>
 }
 
 export function KeysPage() {
@@ -82,7 +83,7 @@ export function KeysPage() {
         setErrors(err.errors)
         setActionError(err.detail)
       } else {
-        setActionError(tr('更新 Key 失败', 'Failed to update key'))
+        setActionError(tr("failed_to_update_key"))
       }
     } finally {
       setBusy(null)
@@ -99,7 +100,7 @@ export function KeysPage() {
       setResetResult(response)
       reload()
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.detail : tr('重置 Key 失败', 'Failed to reset key'))
+      setActionError(err instanceof ApiError ? err.detail : tr("failed_to_reset_key"))
     } finally {
       setBusy(null)
     }
@@ -114,7 +115,7 @@ export function KeysPage() {
       setRevokeTarget(null)
       reload()
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.detail : tr('吊销 Key 失败', 'Failed to revoke key'))
+      setActionError(err instanceof ApiError ? err.detail : tr("failed_to_revoke_key"))
     } finally {
       setBusy(null)
     }
@@ -122,42 +123,36 @@ export function KeysPage() {
 
   const refresh = (
     <button className="btn" type="button" onClick={reload} disabled={loading}>
-      {loading ? tr('刷新中…', 'Refreshing…') : tr('刷新', 'Refresh')}
+      {loading ? tr("refreshing") : tr("refresh")}
     </button>
   )
 
   return (
     <>
       <PageHead
-        title={tr('虚拟 Key', 'Virtual keys')}
-        desc={tr(
-          '每设备一个 Key；白名单/RPM/有效期由 Key 收窄发布与预算。',
-          'One key per device. The allowlist, RPM, and expiry further constrain access and budget at the key level.',
-        )}
+        title={tr("virtual_keys")}
+        desc={tr("one_key_per_device_the_allowlist_rpm_and_expiry_further")}
         actions={refresh}
       />
 
       <div className="card">
         <div className="toolbar">
           <div className="field" style={{ width: 160 }}>
-            <label htmlFor="key-status">{tr('状态', 'Status')}</label>
+            <label htmlFor="key-status">{tr("status")}</label>
             <select
               id="key-status"
               className="select"
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
             >
-              <option value="">{tr('全部', 'All')}</option>
-              <option value="active">{tr('启用', 'Active')}</option>
-              <option value="paused">{tr('暂停', 'Paused')}</option>
-              <option value="revoked">{tr('已吊销', 'Revoked')}</option>
+              <option value="">{tr("all")}</option>
+              <option value="active">{tr("active_2")}</option>
+              <option value="paused">{tr("paused")}</option>
+              <option value="revoked">{tr("revoked_2")}</option>
             </select>
           </div>
           <span className="hint" style={{ marginTop: 18 }}>
-            {tr(
-              'Key 由客户端配对时签发；管理台只改配置/重置/吊销，不创建新 Key。',
-              'Keys are issued during client pairing. The console can edit, reset, or revoke them, but cannot create new keys.',
-            )}
+            {tr("keys_are_issued_during_client_pairing_the_console_can_ed")}
           </span>
         </div>
       </div>
@@ -169,30 +164,27 @@ export function KeysPage() {
       )}
 
       {loading && !data ? (
-        <LoadingPanel title={tr('正在读取虚拟 Key…', 'Loading virtual keys…')} />
+        <LoadingPanel title={tr("loading_virtual_keys")} />
       ) : error ? (
         <ErrorPanel error={error} onRetry={reload} />
       ) : !data || data.items.length === 0 ? (
         <EmptyPanel
-          title={statusFilter ? tr('没有匹配的 Key', 'No matching keys') : tr('还没有虚拟 Key', 'No virtual keys yet')}
-          desc={tr(
-            '员工通过配对码注册设备后，服务端会为该设备签发一个虚拟 Key。',
-            'After an employee registers a device with a pairing code, the server issues a virtual key for that device.',
-          )}
+          title={statusFilter ? tr("no_matching_keys") : tr("no_virtual_keys_yet")}
+          desc={tr("after_an_employee_registers_a_device_with_a_pairing_code")}
         />
       ) : (
         <div className="table-wrap">
           <table className="table dense">
             <thead>
               <tr>
-                <th>{tr('Key 前缀', 'Key prefix')}</th>
-                <th>{tr('用户 / 设备', 'User / device')}</th>
-                <th>{tr('状态', 'Status')}</th>
-                <th>{tr('模型白名单', 'Model allowlist')}</th>
+                <th>{tr("key_prefix")}</th>
+                <th>{tr("user_device")}</th>
+                <th>{tr("status")}</th>
+                <th>{tr("model_allowlist")}</th>
                 <th>RPM</th>
-                <th>{tr('过期', 'Expires')}</th>
-                <th>{tr('最近使用', 'Last used')}</th>
-                <th className="cell-actions">{tr('操作', 'Actions')}</th>
+                <th>{tr("expires")}</th>
+                <th>{tr("last_used")}</th>
+                <th className="cell-actions">{tr("actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -207,14 +199,14 @@ export function KeysPage() {
                     <div className="hint">{key.device.name}</div>
                   </td>
                   <td>{statusBadge(key.status, tr)}</td>
-                  <td>{key.allowed_models.length === 0 ? tr('不限', 'Unlimited') : key.allowed_models.join(', ')}</td>
-                  <td className="num">{key.rpm_limit ?? tr('不限', 'Unlimited')}</td>
-                  <td>{key.expires_at ? new Date(key.expires_at).toLocaleString(locale) : tr('永不过期', 'Never')}</td>
+                  <td>{key.allowed_models.length === 0 ? tr("unlimited") : key.allowed_models.join(', ')}</td>
+                  <td className="num">{key.rpm_limit ?? tr("unlimited")}</td>
+                  <td>{key.expires_at ? new Date(key.expires_at).toLocaleString(locale) : tr("never")}</td>
                   <td>{key.last_used_at ? new Date(key.last_used_at).toLocaleString(locale) : '—'}</td>
                   <td className="cell-actions">
                     <span className="row-actions">
                       <button className="btn sm" type="button" onClick={() => openEdit(key)}>
-                        {tr('编辑', 'Edit')}
+                        {tr("edit")}
                       </button>
                       <button
                         className="btn sm"
@@ -222,7 +214,7 @@ export function KeysPage() {
                         disabled={key.status === 'revoked'}
                         onClick={() => setResetTarget(key)}
                       >
-                        {tr('重置', 'Reset')}
+                        {tr("reset")}
                       </button>
                       <button
                         className="btn sm danger"
@@ -230,7 +222,7 @@ export function KeysPage() {
                         disabled={key.status === 'revoked'}
                         onClick={() => setRevokeTarget(key)}
                       >
-                        {tr('吊销', 'Revoke')}
+                        {tr("revoke_2")}
                       </button>
                     </span>
                   </td>
@@ -239,26 +231,23 @@ export function KeysPage() {
             </tbody>
           </table>
           <div className="hint" style={{ padding: '8px 12px' }}>
-            {tr(
-              `共 ${data.total} 个 Key；同一用户多设备各自一个 Key，共用用户预算。`,
-              `${data.total} keys total. Each device has its own key, and all share the user's budget.`,
-            )}
+            {tr("keys_total_each_device_has_its_own_key_and_all_share_the", { total: data.total })}
           </div>
         </div>
       )}
 
       {editKey && (
         <Modal
-          title={tr('编辑虚拟 Key', 'Edit virtual key')}
+          title={tr("edit_virtual_key")}
           sub={`${editKey.key_prefix} · ${editKey.user.email}`}
           onClose={() => setEditKey(null)}
           footer={
             <>
               <button className="btn" type="button" onClick={() => setEditKey(null)} disabled={busy !== null}>
-                {tr('取消', 'Cancel')}
+                {tr("cancel")}
               </button>
               <button className="btn primary" type="submit" form="edit-key-form" disabled={busy !== null}>
-                {busy === 'save' ? tr('保存中…', 'Saving…') : tr('保存', 'Save')}
+                {busy === 'save' ? tr("saving") : tr("save")}
               </button>
             </>
           }
@@ -266,7 +255,7 @@ export function KeysPage() {
           <form id="edit-key-form" className="grid" onSubmit={(event) => void handleSave(event)} noValidate>
             <div className="field">
               <label htmlFor="key-allowed-models">
-                {tr('模型白名单（逗号分隔，空=不限）', 'Model allowlist (comma-separated, empty = unlimited)')}
+                {tr("model_allowlist_comma_separated_empty_unlimited")}
               </label>
               <input
                 id="key-allowed-models"
@@ -279,20 +268,20 @@ export function KeysPage() {
             </div>
             <div className="grid cols-2">
               <div className="field">
-                <label htmlFor="key-rpm">{tr('RPM 上限', 'RPM limit')}</label>
+                <label htmlFor="key-rpm">{tr("rpm_limit")}</label>
                 <input
                   id="key-rpm"
                   className="input"
                   type="number"
                   min={1}
-                  placeholder={tr('空=不限', 'Empty = unlimited')}
+                  placeholder={tr("empty_unlimited")}
                   value={draft.rpm_limit}
                   onChange={(event) => setDraft({ ...draft, rpm_limit: event.target.value })}
                 />
                 {errors.rpm_limit && <span className="field-error">{errors.rpm_limit}</span>}
               </div>
               <div className="field">
-                <label htmlFor="key-expires">{tr('过期时间（本地）', 'Expiry (local time)')}</label>
+                <label htmlFor="key-expires">{tr("expiry_local_time")}</label>
                 <input
                   id="key-expires"
                   className="input"
@@ -302,7 +291,7 @@ export function KeysPage() {
                 />
                 {errors.expires_at && <span className="field-error">{errors.expires_at}</span>}
                 <button className="btn sm" type="button" onClick={() => setDraft({ ...draft, expires_at: '' })}>
-                  {tr('清除过期', 'Clear expiry')}
+                  {tr("clear_expiry")}
                 </button>
               </div>
             </div>
@@ -317,16 +306,13 @@ export function KeysPage() {
 
       {resetTarget && (
         <ConfirmDialog
-          title={tr(`重置 Key ${resetTarget.key_prefix}？`, `Reset key ${resetTarget.key_prefix}?`)}
+          title={tr("reset_key", { key_prefix: resetTarget.key_prefix })}
           desc={
             <p>
-              {tr(
-                '旧 Key 立即失效；新明文 Key 只显示一次，请安全交给员工。',
-                'The old key stops working immediately. The new plaintext key is shown only once, so deliver it to the employee securely.',
-              )}
+              {tr("the_old_key_stops_working_immediately_the_new_plaintext")}
             </p>
           }
-          confirmText={tr('重置', 'Reset')}
+          confirmText={tr("reset")}
           danger
           busy={busy === 'reset'}
           onCancel={() => setResetTarget(null)}
@@ -336,16 +322,13 @@ export function KeysPage() {
 
       {revokeTarget && (
         <ConfirmDialog
-          title={tr(`吊销 Key ${revokeTarget.key_prefix}？`, `Revoke key ${revokeTarget.key_prefix}?`)}
+          title={tr("revoke_key", { key_prefix: revokeTarget.key_prefix })}
           desc={
             <p>
-              {tr(
-                '吊销后该设备请求立即 401；操作写入审计。重复吊销幂等。',
-                'Requests from this device will immediately return 401. The action is recorded in the audit log and is idempotent.',
-              )}
+              {tr("requests_from_this_device_will_immediately_return_401_th")}
             </p>
           }
-          confirmText={tr('吊销', 'Revoke')}
+          confirmText={tr("revoke_2")}
           danger
           busy={busy === 'revoke'}
           onCancel={() => setRevokeTarget(null)}
@@ -355,12 +338,12 @@ export function KeysPage() {
 
       {resetResult && (
         <Modal
-          title={tr('新 Key 已生成', 'New key generated')}
-          sub={tr('仅显示一次，请立即保存；旧 Key 已失效', 'Shown only once. Save it now; the old key is no longer valid.')}
+          title={tr("new_key_generated")}
+          sub={tr("shown_only_once_save_it_now_the_old_key_is_no_longer_val")}
           onClose={() => setResetResult(null)}
           footer={
             <button className="btn primary" type="button" onClick={() => setResetResult(null)}>
-              {tr('我已保存', 'I saved it')}
+              {tr("i_saved_it")}
             </button>
           }
         >
@@ -369,7 +352,7 @@ export function KeysPage() {
             <div className="row">
               <input className="input" readOnly value={resetResult.api_key} style={{ fontFamily: 'var(--mono)' }} />
               <button className="btn" type="button" onClick={() => void navigator.clipboard?.writeText(resetResult.api_key)}>
-                {tr('复制', 'Copy')}
+                {tr("copy")}
               </button>
             </div>
             <span className="hint">

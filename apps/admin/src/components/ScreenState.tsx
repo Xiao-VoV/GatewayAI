@@ -4,7 +4,7 @@ import { useI18n } from '../i18n/I18nProvider'
 
 export function LoadingPanel({ title }: { title?: string }) {
   const { tr } = useI18n()
-  const label = title ?? tr('正在加载…', 'Loading…')
+  const label = title ?? tr("loading")
   return (
     <div className="card" aria-busy="true" aria-live="polite">
       <div className="skeleton skeleton-line" style={{ width: 120 }} />
@@ -19,7 +19,7 @@ export function ErrorPanel({ error, onRetry }: { error: ApiError; onRetry: () =>
   const { tr } = useI18n()
   return (
     <div className="statebox" role="alert">
-      <h3>{tr('加载失败', 'Failed to load')}</h3>
+      <h3>{tr("failed_to_load")}</h3>
       <p>{error.detail}</p>
       <p className="hint">
         {error.code}
@@ -27,7 +27,7 @@ export function ErrorPanel({ error, onRetry }: { error: ApiError; onRetry: () =>
       </p>
       <div className="actions">
         <button className="btn primary" type="button" onClick={onRetry}>
-          {tr('重试', 'Retry')}
+          {tr("retry")}
         </button>
       </div>
     </div>

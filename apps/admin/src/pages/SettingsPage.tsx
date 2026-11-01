@@ -12,10 +12,7 @@ import { useI18n } from '../i18n/I18nProvider'
 
 export function SettingsPage() {
   const { tr } = useI18n()
-  const summaryDesc = tr(
-    '运行期默认供应商、日志/审计保留与上游超时。',
-    'Default provider, log and audit retention, and upstream timeout at runtime.',
-  )
+  const summaryDesc = tr("default_provider_log_and_audit_retention_and_upstream_ti_2")
   const { data, loading, error, reload } = useAsync(
     () => Promise.all([getSettings(), listProviders({ limit: 200 })]).then(([settings, providers]) => ({
       settings,
@@ -55,7 +52,7 @@ export function SettingsPage() {
         setFieldErrors(err.errors)
         setSaveError(err.detail)
       } else {
-        setSaveError(tr('保存设置失败', 'Failed to save settings'))
+        setSaveError(tr("failed_to_save_settings"))
       }
     } finally {
       setSaving(false)
@@ -65,15 +62,15 @@ export function SettingsPage() {
   if (loading && !data) {
     return (
       <>
-        <PageHead title={tr('设置', 'Settings')} desc={summaryDesc} />
-        <LoadingPanel title={tr('正在读取设置…', 'Loading settings…')} />
+        <PageHead title={tr("settings")} desc={summaryDesc} />
+        <LoadingPanel title={tr("loading_settings")} />
       </>
     )
   }
   if (error) {
     return (
       <>
-        <PageHead title={tr('设置', 'Settings')} desc={summaryDesc} />
+        <PageHead title={tr("settings")} desc={summaryDesc} />
         <ErrorPanel error={error} onRetry={reload} />
       </>
     )
@@ -83,14 +80,11 @@ export function SettingsPage() {
   return (
     <>
       <PageHead
-        title={tr('设置', 'Settings')}
-        desc={tr(
-          '运行期默认供应商、日志/审计保留与上游超时；修改写入审计。',
-          'Default provider, log and audit retention, and upstream timeout at runtime; changes are written to the audit log.',
-        )}
+        title={tr("settings")}
+        desc={tr("default_provider_log_and_audit_retention_and_upstream_ti")}
         actions={
           <button className="btn" type="button" onClick={reload} disabled={saving}>
-            {tr('重新读取', 'Reload')}
+            {tr("reload")}
           </button>
         }
       />
@@ -102,13 +96,13 @@ export function SettingsPage() {
       )}
       {savedAt && (
         <div className="note" role="status">
-          {tr('已保存', 'Saved')} · {savedAt}
+          {tr("saved")} · {savedAt}
         </div>
       )}
 
       <form className="card grid" onSubmit={(event) => void handleSave(event)} noValidate>
         <div className="field">
-          <label htmlFor="settings-default-provider">{tr('默认供应商', 'Default provider')}</label>
+          <label htmlFor="settings-default-provider">{tr("default_provider")}</label>
           <select
             id="settings-default-provider"
             className="select"
@@ -117,7 +111,7 @@ export function SettingsPage() {
               setForm({ ...form, default_provider_id: event.target.value || null })
             }
           >
-            <option value="">{tr('未设置', 'Not set')}</option>
+            <option value="">{tr("not_set")}</option>
             {data?.providers.map((provider: Provider) => (
               <option key={provider.id} value={provider.id}>
                 {provider.name} · {provider.status}
@@ -128,16 +122,13 @@ export function SettingsPage() {
             <span className="field-error">{fieldErrors.default_provider_id}</span>
           )}
           <span className="hint">
-            {tr(
-              '默认供应商用于无显式供应商的部署/测试；可清除。',
-              'Used for deployments and tests without an explicit provider; can be cleared.',
-            )}
+            {tr("used_for_deployments_and_tests_without_an_explicit_provi")}
           </span>
         </div>
 
         <div className="grid cols-3">
           <div className="field">
-            <label htmlFor="settings-request-retention">{tr('请求日志保留（天）', 'Request log retention (days)')}</label>
+            <label htmlFor="settings-request-retention">{tr("request_log_retention_days")}</label>
             <input
               id="settings-request-retention"
               className="input"
@@ -155,7 +146,7 @@ export function SettingsPage() {
             <span className="hint">1–365</span>
           </div>
           <div className="field">
-            <label htmlFor="settings-audit-retention">{tr('审计保留（天）', 'Audit retention (days)')}</label>
+            <label htmlFor="settings-audit-retention">{tr("audit_retention_days")}</label>
             <input
               id="settings-audit-retention"
               className="input"
@@ -168,10 +159,10 @@ export function SettingsPage() {
             {fieldErrors.audit_retention_days && (
               <span className="field-error">{fieldErrors.audit_retention_days}</span>
             )}
-            <span className="hint">{tr('180–3650（合规下限）', '180–3650 (compliance minimum)')}</span>
+            <span className="hint">{tr("180_3650_compliance_minimum")}</span>
           </div>
           <div className="field">
-            <label htmlFor="settings-upstream-timeout">{tr('上游超时（秒）', 'Upstream timeout (seconds)')}</label>
+            <label htmlFor="settings-upstream-timeout">{tr("upstream_timeout_seconds")}</label>
             <input
               id="settings-upstream-timeout"
               className="input"
@@ -184,27 +175,24 @@ export function SettingsPage() {
             {fieldErrors.upstream_timeout_secs && (
               <span className="field-error">{fieldErrors.upstream_timeout_secs}</span>
             )}
-            <span className="hint">{tr('5–600 秒', '5–600 seconds')}</span>
+            <span className="hint">{tr("5_600_seconds")}</span>
           </div>
         </div>
 
         <div className="row">
           <button className="btn primary" type="submit" disabled={saving}>
-            {saving ? tr('保存中…', 'Saving…') : tr('保存设置', 'Save settings')}
+            {saving ? tr("saving") : tr("save_settings")}
           </button>
           <span className="hint">
-            {tr('更新时间', 'Last updated')} {new Date(form.updated_at).toLocaleString('zh-CN')}
+            {tr("last_updated")} {new Date(form.updated_at).toLocaleString('zh-CN')}
           </span>
         </div>
       </form>
 
       <div className="card">
-        <h3>{tr('说明', 'Notes')}</h3>
+        <h3>{tr("notes")}</h3>
         <p className="sub" style={{ marginTop: 6 }}>
-          {tr(
-            '清理任务按保留天数删除旧 request_logs / audit_logs；上游超时作用于代理上游请求。设置变更会写审计。',
-            'Cleanup jobs delete old request_logs and audit_logs per retention period; the upstream timeout applies to proxied upstream requests. Setting changes are audited.',
-          )}
+          {tr("cleanup_jobs_delete_old_request_logs_and_audit_logs_per")}
         </p>
       </div>
     </>

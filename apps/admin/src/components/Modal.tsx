@@ -36,7 +36,7 @@ export function Modal({ title, sub, onClose, children, footer, wide = false }: M
             <h3>{title}</h3>
             {sub && <div className="sub">{sub}</div>}
           </div>
-          <button className="btn sm ghost" type="button" style={{ marginLeft: 'auto' }} onClick={onClose} aria-label={tr('关闭', 'Close')}>
+          <button className="btn sm ghost" type="button" style={{ marginLeft: 'auto' }} onClick={onClose} aria-label={tr("close")}>
             ×
           </button>
         </div>
@@ -73,10 +73,10 @@ export function ConfirmDialog({
       footer={
         <>
           <button className="btn" type="button" onClick={onCancel} disabled={busy}>
-            {tr('取消', 'Cancel')}
+            {tr("cancel")}
           </button>
           <button className={`btn ${danger ? 'danger' : 'primary'}`} type="button" onClick={onConfirm} disabled={busy}>
-            {busy ? tr('处理中…', 'Processing…') : (confirmText ?? tr('确认', 'Confirm'))}
+            {busy ? tr("processing") : (confirmText ?? tr("confirm"))}
           </button>
         </>
       }

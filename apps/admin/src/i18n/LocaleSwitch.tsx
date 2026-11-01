@@ -1,15 +1,20 @@
+import { SUPPORTED_LOCALES } from './translate'
 import { useI18n } from './I18nProvider'
 
 export function LocaleSwitch({ className = '' }: { className?: string }) {
-  const { locale, toggleLocale } = useI18n()
+  const { locale, setLocale } = useI18n()
   return (
-    <button
-      className={`btn sm ghost locale-switch ${className}`.trim()}
-      type="button"
-      onClick={toggleLocale}
-      title={locale === 'zh-CN' ? 'Switch to English' : '切换到中文'}
+    <select
+      className={`select locale-select ${className}`.trim()}
+      aria-label="Language"
+      value={locale}
+      onChange={(event) => setLocale(event.target.value as typeof locale)}
     >
-      {locale === 'zh-CN' ? 'EN' : '中文'}
-    </button>
+      {SUPPORTED_LOCALES.map((item) => (
+        <option key={item.id} value={item.id}>
+          {item.label}
+        </option>
+      ))}
+    </select>
   )
 }

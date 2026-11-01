@@ -17,6 +17,7 @@ import { Badge, PageHead } from '../components/ui'
 import { ConfirmDialog, Modal } from '../components/Modal'
 import { EmptyPanel, ErrorPanel, LoadingPanel } from '../components/ScreenState'
 import { useI18n } from '../i18n/I18nProvider'
+import type { Translate } from '../i18n/translate'
 
 interface Draft {
   tool_key: string
@@ -36,9 +37,9 @@ const emptyDraft: Draft = {
   allowed_model_group_ids: [],
 }
 
-function scopeLabel(defaultItem: ToolModelDefault, tr: (zh: string, en: string) => string) {
-  if (defaultItem.scope_type === 'global') return tr('全局', 'Global')
-  return `${defaultItem.scope_type === 'user_group' ? tr('用户组', 'User group') : tr('用户', 'User')} · ${defaultItem.scope_label ?? defaultItem.scope_id?.slice(0, 8) ?? '—'}`
+function scopeLabel(defaultItem: ToolModelDefault, tr: Translate) {
+  if (defaultItem.scope_type === 'global') return tr("global")
+  return `${defaultItem.scope_type === 'user_group' ? tr("user_group") : tr("user")} · ${defaultItem.scope_label ?? defaultItem.scope_id?.slice(0, 8) ?? '—'}`
 }
 
 export function ToolDefaultsPage() {
@@ -127,7 +128,7 @@ export function ToolDefaultsPage() {
         setErrors(err.errors)
         setActionError(err.detail)
       } else {
-        setActionError(tr('保存工具默认失败', 'Failed to save tool default'))
+        setActionError(tr("failed_to_save_tool_default"))
       }
     } finally {
       setBusy(null)
@@ -143,7 +144,7 @@ export function ToolDefaultsPage() {
       setDeleteTarget(null)
       reload()
     } catch (err) {
-      setActionError(err instanceof ApiError ? err.detail : tr('删除工具默认失败', 'Failed to delete tool default'))
+      setActionError(err instanceof ApiError ? err.detail : tr("failed_to_delete_tool_default"))
     } finally {
       setBusy(null)
     }
@@ -160,23 +161,20 @@ export function ToolDefaultsPage() {
 
   const refresh = (
     <button className="btn" type="button" onClick={reload} disabled={loading}>
-      {loading ? tr('刷新中…', 'Refreshing…') : tr('刷新', 'Refresh')}
+      {loading ? tr("refreshing") : tr("refresh")}
     </button>
   )
 
   return (
     <>
       <PageHead
-        title={tr('工具默认', 'Tool defaults')}
-        desc={tr(
-          '每工具默认模型与可切换白名单；user > user_group > global。',
-          'Default model per tool and switchable allowlist; user > user_group > global.',
-        )}
+        title={tr("tool_defaults")}
+        desc={tr("default_model_per_tool_and_switchable_allowlist_user_use")}
         actions={
           <>
             {refresh}
             <button className="btn primary" type="button" onClick={openCreate}>
-              {tr('新建工具默认', 'New tool default')}
+              {tr("new_tool_default")}
             </button>
           </>
         }
@@ -185,42 +183,36 @@ export function ToolDefaultsPage() {
       <div className="card">
         <div className="toolbar">
           <div className="field" style={{ width: 180 }}>
-            <label htmlFor="tool-scope-filter">{tr('作用域', 'Scope')}</label>
+            <label htmlFor="tool-scope-filter">{tr("scope")}</label>
             <select
               id="tool-scope-filter"
               className="select"
               value={scopeFilter}
               onChange={(event) => setScopeFilter(event.target.value)}
             >
-              <option value="">{tr('全部', 'All')}</option>
-              <option value="global">{tr('全局', 'Global')}</option>
-              <option value="user_group">{tr('用户组', 'User group')}</option>
-              <option value="user">{tr('用户', 'User')}</option>
+              <option value="">{tr("all")}</option>
+              <option value="global">{tr("global")}</option>
+              <option value="user_group">{tr("user_group")}</option>
+              <option value="user">{tr("user")}</option>
             </select>
           </div>
           <span className="hint" style={{ marginTop: 18 }}>
-            {tr(
-              '白名单只收窄发布；客户端实际默认需同时可见且可调用。',
-              'The allowlist only narrows publishing; the effective client default must be visible and callable.',
-            )}
+            {tr("the_allowlist_only_narrows_publishing_the_effective_clie")}
           </span>
         </div>
       </div>
 
       {loading && !data ? (
-        <LoadingPanel title={tr('正在读取工具默认…', 'Loading tool defaults…')} />
+        <LoadingPanel title={tr("loading_tool_defaults")} />
       ) : error ? (
         <ErrorPanel error={error} onRetry={reload} />
       ) : !data || data.defaults.length === 0 ? (
         <EmptyPanel
-          title={tr('还没有工具默认', 'No tool defaults yet')}
-          desc={tr(
-            '为 Claude Code / Codex / Gemini CLI 等工具配置默认模型与可切换范围。',
-            'Configure default models and switchable ranges for Claude Code, Codex, Gemini CLI, and more.',
-          )}
+          title={tr("no_tool_defaults_yet")}
+          desc={tr("configure_default_models_and_switchable_ranges_for_claud")}
           action={
             <button className="btn primary" type="button" onClick={openCreate}>
-              {tr('新建工具默认', 'New tool default')}
+              {tr("new_tool_default")}
             </button>
           }
         />
@@ -229,13 +221,13 @@ export function ToolDefaultsPage() {
           <table className="table dense">
             <thead>
               <tr>
-                <th>{tr('工具', 'Tool')}</th>
-                <th>{tr('作用域', 'Scope')}</th>
-                <th>{tr('默认模型', 'Default model')}</th>
-                <th>{tr('允许切换', 'Switching')}</th>
-                <th>{tr('白名单', 'Allowlist')}</th>
-                <th>{tr('更新时间', 'Updated')}</th>
-                <th className="cell-actions">{tr('操作', 'Actions')}</th>
+                <th>{tr("tool")}</th>
+                <th>{tr("scope")}</th>
+                <th>{tr("default_model")}</th>
+                <th>{tr("switching")}</th>
+                <th>{tr("allowlist")}</th>
+                <th>{tr("updated")}</th>
+                <th className="cell-actions">{tr("actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -250,7 +242,7 @@ export function ToolDefaultsPage() {
                   <td>{item.default_model_client_name}</td>
                   <td>
                     <Badge tone={item.allow_switch ? 'ok' : ''}>
-                      {item.allow_switch ? tr('允许', 'Allowed') : tr('固定', 'Fixed')}
+                      {item.allow_switch ? tr("allowed_2") : tr("fixed")}
                     </Badge>
                   </td>
                   <td>
@@ -262,10 +254,10 @@ export function ToolDefaultsPage() {
                   <td className="cell-actions">
                     <span className="row-actions">
                       <button className="btn sm" type="button" onClick={() => openEdit(item)}>
-                        {tr('编辑', 'Edit')}
+                        {tr("edit")}
                       </button>
                       <button className="btn sm danger" type="button" onClick={() => setDeleteTarget(item)}>
-                        {tr('删除', 'Delete')}
+                        {tr("delete")}
                       </button>
                     </span>
                   </td>
@@ -278,10 +270,10 @@ export function ToolDefaultsPage() {
 
       {modalOpen && data && (
         <Modal
-          title={editId ? tr('编辑工具默认', 'Edit tool default') : tr('新建工具默认', 'New tool default')}
+          title={editId ? tr("edit_tool_default") : tr("new_tool_default")}
           sub={
             editId
-              ? tr('作用域与工具标识不可修改', 'Scope and tool identifier cannot be changed')
+              ? tr("scope_and_tool_identifier_cannot_be_changed")
               : 'global / user_group / user'
           }
           onClose={() => setModalOpen(false)}
@@ -289,10 +281,10 @@ export function ToolDefaultsPage() {
           footer={
             <>
               <button className="btn" type="button" onClick={() => setModalOpen(false)} disabled={busy !== null}>
-                {tr('取消', 'Cancel')}
+                {tr("cancel")}
               </button>
               <button className="btn primary" type="submit" form="tool-default-form" disabled={busy !== null}>
-                {busy === 'save' ? tr('保存中…', 'Saving…') : tr('保存', 'Save')}
+                {busy === 'save' ? tr("saving") : tr("save")}
               </button>
             </>
           }
@@ -301,7 +293,7 @@ export function ToolDefaultsPage() {
             {!editId && (
               <div className="grid cols-2">
                 <div className="field">
-                  <label htmlFor="tool-key">{tr('工具标识', 'Tool identifier')}</label>
+                  <label htmlFor="tool-key">{tr("tool_identifier")}</label>
                   <select
                     id="tool-key"
                     className="select"
@@ -317,7 +309,7 @@ export function ToolDefaultsPage() {
                   {errors.tool_key && <span className="field-error">{errors.tool_key}</span>}
                 </div>
                 <div className="field">
-                  <label htmlFor="tool-scope">{tr('作用域', 'Scope')}</label>
+                  <label htmlFor="tool-scope">{tr("scope")}</label>
                   <select
                     id="tool-scope"
                     className="select"
@@ -330,27 +322,27 @@ export function ToolDefaultsPage() {
                       })
                     }
                   >
-                    <option value="global">{tr('全局', 'Global')}</option>
-                    <option value="user_group">{tr('用户组', 'User group')}</option>
-                    <option value="user">{tr('用户', 'User')}</option>
+                    <option value="global">{tr("global")}</option>
+                    <option value="user_group">{tr("user_group")}</option>
+                    <option value="user">{tr("user")}</option>
                   </select>
                 </div>
               </div>
             )}
             {!editId && draft.scope_type !== 'global' && (
               <div className="field">
-                <label>{draft.scope_type === 'user_group' ? tr('用户组', 'User group') : tr('用户', 'User')}</label>
+                <label>{draft.scope_type === 'user_group' ? tr("user_group") : tr("user")}</label>
                 <select
                   className="select"
                   value={draft.scope_id}
                   onChange={(event) => setDraft({ ...draft, scope_id: event.target.value })}
                 >
-                  <option value="">{tr('请选择', 'Select…')}</option>
+                  <option value="">{tr("select")}</option>
                   {draft.scope_type === 'user_group'
                     ? data.userGroups.map((group: UserGroupSummary) => (
                         <option key={group.id} value={group.id}>
                           {group.name} · {group.member_count}{' '}
-                          {tr('人', group.member_count === 1 ? 'member' : 'members')}
+                          {tr(group.member_count === 1 ? 'member_count_unit_singular' : 'member_count_unit_plural')}
                         </option>
                       ))
                     : data.users.map((user: AdminUser) => (
@@ -363,14 +355,14 @@ export function ToolDefaultsPage() {
               </div>
             )}
             <div className="field">
-              <label htmlFor="tool-default-group">{tr('默认模型组', 'Default model group')}</label>
+              <label htmlFor="tool-default-group">{tr("default_model_group")}</label>
               <select
                 id="tool-default-group"
                 className="select"
                 value={draft.default_model_group_id}
                 onChange={(event) => setDraft({ ...draft, default_model_group_id: event.target.value })}
               >
-                <option value="">{tr('请选择 active 模型组', 'Select an active model group')}</option>
+                <option value="">{tr("select_an_active_model_group")}</option>
                 {data.groups.map((group: ModelGroupSummary) => (
                   <option key={group.id} value={group.id}>
                     {group.client_model_name}
@@ -388,12 +380,12 @@ export function ToolDefaultsPage() {
                   checked={draft.allow_switch}
                   onChange={(event) => setDraft({ ...draft, allow_switch: event.target.checked })}
                 />
-                {tr('允许在白名单内切换', 'Allow switching within the allowlist')}
+                {tr("allow_switching_within_the_allowlist")}
               </label>
             </div>
             {draft.allow_switch && (
               <div className="field">
-                <label>{tr('可切换模型组（白名单）', 'Switchable model groups (allowlist)')}</label>
+                <label>{tr("switchable_model_groups_allowlist")}</label>
                 <div className="toolbar" style={{ gap: 6 }}>
                   {data.groups.map((group: ModelGroupSummary) => (
                     <label key={group.id} className="chk">
@@ -423,16 +415,13 @@ export function ToolDefaultsPage() {
 
       {deleteTarget && (
         <ConfirmDialog
-          title={tr(`删除工具默认 ${deleteTarget.tool_key}？`, `Delete tool default ${deleteTarget.tool_key}?`)}
+          title={tr("delete_tool_default", { tool_key: deleteTarget.tool_key })}
           desc={
             <p>
-              {tr(
-                '删除后该作用域不再有工具默认；不会删除模型组。',
-                'After deletion, this scope will have no tool default; model groups are not deleted.',
-              )}
+              {tr("after_deletion_this_scope_will_have_no_tool_default_mode")}
             </p>
           }
-          confirmText={tr('删除', 'Delete')}
+          confirmText={tr("delete")}
           danger
           busy={busy === 'delete'}
           onCancel={() => setDeleteTarget(null)}

@@ -27,11 +27,11 @@ export function AccountPage() {
     setFieldErrors({})
     setSuccess(false)
     if (newPassword.length < 10) {
-      setFieldErrors({ new_password: tr('新密码至少 10 个字符', 'New password must be at least 10 characters') })
+      setFieldErrors({ new_password: tr("new_password_must_be_at_least_10_characters") })
       return
     }
     if (newPassword !== confirm) {
-      setFieldErrors({ confirm: tr('两次输入的新密码不一致', 'New passwords do not match') })
+      setFieldErrors({ confirm: tr("new_passwords_do_not_match") })
       return
     }
     setSaving(true)
@@ -46,7 +46,7 @@ export function AccountPage() {
         setFieldErrors(err.errors)
         setFormError(err.detail)
       } else {
-        setFormError(tr('修改密码失败', 'Failed to change password'))
+        setFormError(tr("failed_to_change_password"))
       }
     } finally {
       setSaving(false)
@@ -68,23 +68,23 @@ export function AccountPage() {
   return (
     <>
       <PageHead
-        title={tr('账号与会话', 'Account & session')}
-        desc={tr('当前管理员、修改密码与退出登录。', 'Current administrator, password change and sign-out.')}
+        title={tr("account_session")}
+        desc={tr("current_administrator_password_change_and_sign_out")}
       />
 
       <div className="grid cols-2">
         <div className="card">
-          <h3>{tr('当前管理员', 'Current administrator')}</h3>
+          <h3>{tr("current_administrator")}</h3>
           <dl className="kv" style={{ marginTop: 10 }}>
-            <dt>{tr('显示名', 'Display name')}</dt>
+            <dt>{tr("display_name")}</dt>
             <dd>{session.user.display_name || '—'}</dd>
-            <dt>{tr('邮箱', 'Email')}</dt>
+            <dt>{tr("email")}</dt>
             <dd>{session.user.email}</dd>
-            <dt>{tr('状态', 'Status')}</dt>
+            <dt>{tr("status")}</dt>
             <dd>
               <Badge tone={session.user.status === 'active' ? 'ok' : 'bad'}>{session.user.status}</Badge>
             </dd>
-            <dt>{tr('会话过期', 'Session expires')}</dt>
+            <dt>{tr("session_expires")}</dt>
             <dd>{new Date(session.expires_at).toLocaleString('zh-CN')}</dd>
             <dt>user_id</dt>
             <dd>
@@ -98,15 +98,15 @@ export function AccountPage() {
             disabled={loggingOut}
             style={{ marginTop: 14 }}
           >
-            {loggingOut ? tr('退出中…', 'Signing out…') : tr('退出登录', 'Sign out')}
+            {loggingOut ? tr("signing_out") : tr("sign_out_2")}
           </button>
         </div>
 
         <div className="card">
-          <h3>{tr('修改密码', 'Change password')}</h3>
+          <h3>{tr("change_password")}</h3>
           <form className="grid" onSubmit={(event) => void handleSubmit(event)} noValidate style={{ marginTop: 10 }}>
             <div className="field">
-              <label htmlFor="account-current">{tr('当前密码', 'Current password')}</label>
+              <label htmlFor="account-current">{tr("current_password")}</label>
               <input
                 id="account-current"
                 className="input"
@@ -118,7 +118,7 @@ export function AccountPage() {
               {fieldErrors.current_password && <span className="field-error">{fieldErrors.current_password}</span>}
             </div>
             <div className="field">
-              <label htmlFor="account-new">{tr('新密码', 'New password')}</label>
+              <label htmlFor="account-new">{tr("new_password")}</label>
               <input
                 id="account-new"
                 className="input"
@@ -130,7 +130,7 @@ export function AccountPage() {
               {fieldErrors.new_password && <span className="field-error">{fieldErrors.new_password}</span>}
             </div>
             <div className="field">
-              <label htmlFor="account-confirm">{tr('确认新密码', 'Confirm new password')}</label>
+              <label htmlFor="account-confirm">{tr("confirm_new_password")}</label>
               <input
                 id="account-confirm"
                 className="input"
@@ -148,26 +148,20 @@ export function AccountPage() {
             )}
             {success && (
               <div className="note" role="status">
-                {tr(
-                  '密码已更新；其他会话已失效，当前会话保留。',
-                  'Password updated. Other sessions were revoked; this session remains active.',
-                )}
+                {tr("password_updated_other_sessions_were_revoked_this_sessio")}
               </div>
             )}
             <button className="btn primary" type="submit" disabled={saving}>
-              {saving ? tr('保存中…', 'Saving…') : tr('更新密码', 'Update password')}
+              {saving ? tr("saving") : tr("update_password")}
             </button>
           </form>
         </div>
       </div>
 
       <div className="card">
-        <h3>{tr('安全说明', 'Security notes')}</h3>
+        <h3>{tr("security_notes")}</h3>
         <p className="sub" style={{ marginTop: 6 }}>
-          {tr(
-            'Session Cookie 为 HttpOnly；CSRF token 仅保存在内存，刷新后从 /auth/me 重新获取。修改密码会吊销其他会话。',
-            'The session cookie is HttpOnly; the CSRF token is kept in memory only and re-fetched from /auth/me after a refresh. Changing the password revokes other sessions.',
-          )}
+          {tr("the_session_cookie_is_httponly_the_csrf_token_is_kept_in")}
         </p>
       </div>
     </>

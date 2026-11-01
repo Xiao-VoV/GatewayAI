@@ -23,9 +23,9 @@ export function SetupPage() {
     event.preventDefault()
     setFormError(null)
     const errors: Record<string, string> = {}
-    if (!email.trim()) errors.email = tr('请输入管理员邮箱', 'Enter the administrator email')
-    if (password.length < 10) errors.password = tr('密码至少 10 个字符', 'Password must be at least 10 characters')
-    if (password !== confirm) errors.confirm = tr('两次输入的密码不一致', 'Passwords do not match')
+    if (!email.trim()) errors.email = tr("enter_the_administrator_email")
+    if (password.length < 10) errors.password = tr("password_must_be_at_least_10_characters")
+    if (password !== confirm) errors.confirm = tr("passwords_do_not_match")
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) return
 
@@ -43,7 +43,7 @@ export function SetupPage() {
         setFieldErrors(error.errors)
         setFormError(error.detail)
       } else {
-        setFormError(tr('创建管理员失败，请重试', 'Failed to create administrator. Try again.'))
+        setFormError(tr("failed_to_create_administrator_try_again"))
       }
     } finally {
       setSubmitting(false)
@@ -55,16 +55,13 @@ export function SetupPage() {
       <div className="login-card">
         <div className="login-locale"><LocaleSwitch /></div>
         <img className="login-logo" src="/logo.svg" alt="Orveil" />
-        <h1>{tr('初始化 Orveil Console', 'Set up Orveil Console')}</h1>
+        <h1>{tr("set_up_orveil_console")}</h1>
         <p>
-          {tr(
-            '第一次启动，创建管理员账号。创建后使用该账号登录。',
-            'First launch: create the administrator account, then sign in with it.',
-          )}
+          {tr("first_launch_create_the_administrator_account_then_sign")}
         </p>
         <form className="grid" onSubmit={(event) => void handleSubmit(event)} noValidate>
           <div className="field">
-            <label htmlFor="setup-email">{tr('邮箱', 'Email')}</label>
+            <label htmlFor="setup-email">{tr("email")}</label>
             <input
               id="setup-email"
               className="input"
@@ -77,32 +74,32 @@ export function SetupPage() {
             {fieldErrors.email && <span className="field-error">{fieldErrors.email}</span>}
           </div>
           <div className="field">
-            <label htmlFor="setup-name">{tr('显示名（可选）', 'Display name (optional)')}</label>
+            <label htmlFor="setup-name">{tr("display_name_optional")}</label>
             <input
               id="setup-name"
               className="input"
               autoComplete="name"
-              placeholder={tr('平台管理员', 'Platform administrator')}
+              placeholder={tr("platform_administrator")}
               value={displayName}
               onChange={(event) => setDisplayName(event.target.value)}
             />
             {fieldErrors.display_name && <span className="field-error">{fieldErrors.display_name}</span>}
           </div>
           <div className="field">
-            <label htmlFor="setup-password">{tr('密码', 'Password')}</label>
+            <label htmlFor="setup-password">{tr("password")}</label>
             <input
               id="setup-password"
               className="input"
               type="password"
               autoComplete="new-password"
-              placeholder={tr('至少 10 个字符', 'At least 10 characters')}
+              placeholder={tr("at_least_10_characters")}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
             />
             {fieldErrors.password && <span className="field-error">{fieldErrors.password}</span>}
           </div>
           <div className="field">
-            <label htmlFor="setup-confirm">{tr('确认密码', 'Confirm password')}</label>
+            <label htmlFor="setup-confirm">{tr("confirm_password")}</label>
             <input
               id="setup-confirm"
               className="input"
@@ -125,10 +122,7 @@ export function SetupPage() {
                 onChange={(event) => setSetupToken(event.target.value)}
               />
               <span className="hint">
-                {tr(
-                  '服务端配置了 GW_SETUP_TOKEN，需要提供相同值',
-                  'GW_SETUP_TOKEN is configured on the server; enter the same value here.',
-                )}
+                {tr("gw_setup_token_is_configured_on_the_server_enter_the_sam")}
               </span>
             </div>
           )}
@@ -138,10 +132,10 @@ export function SetupPage() {
             </div>
           )}
           <button className="btn primary" type="submit" disabled={submitting}>
-            {submitting ? tr('创建中…', 'Creating…') : tr('创建管理员', 'Create administrator')}
+            {submitting ? tr("creating") : tr("create_administrator")}
           </button>
           <span className="hint">
-            {tr('已有管理员后，此页面不可再次创建。', 'Once an administrator exists, this page can no longer create one.')}
+            {tr("once_an_administrator_exists_this_page_can_no_longer_cre")}
           </span>
         </form>
       </div>
